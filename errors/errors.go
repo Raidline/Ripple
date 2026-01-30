@@ -17,3 +17,11 @@ func (e *LanguageNotFoundError) Error() string {
 		e.Arg, e.Message, strings.Join(e.Supported, ","),
 	)
 }
+
+func NewLanguageNotSupportedError(lang string) *LanguageNotFoundError {
+	return &LanguageNotFoundError{
+		Arg:       lang,
+		Message:   "Language not supported",
+		Supported: make([]string, 0),
+	}
+}

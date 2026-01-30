@@ -4,9 +4,9 @@ import (
 	"testing"
 )
 
-func TestCreep(t *testing.T) {
+func TestCreepDir(t *testing.T) {
 
-	filesIter, err := Creep("../resources/test-files")
+	filesIter, err := CreepDir("../resources/test-files")
 
 	if err != nil {
 		t.Errorf("Directory should be able to be read : %s", err.Error())
@@ -19,15 +19,15 @@ func TestCreep(t *testing.T) {
 
 	for file := range filesIter {
 
-		if file.err != nil {
-			t.Errorf("There as been an error while reading the file : %s", file.err.Error())
+		if file.Err != nil {
+			t.Errorf("There as been an error while reading the file : %s", file.Err.Error())
 			t.FailNow()
 		}
 
 		filesFound++
 		dirs[file.Dir] = true
 
-		for _ = range file.lines {
+		for _ = range file.Lines {
 			gotFiles = true
 		}
 	}

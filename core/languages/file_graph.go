@@ -2,43 +2,13 @@ package languages
 
 import (
 	"context"
+	"raidline/ripple/core/model"
 	"raidline/ripple/pgk"
 
 	sitter "github.com/smacker/go-tree-sitter"
 )
 
-// --- Graph Structures ---
-
-type ClassGraph struct {
-	ClassName string
-	Fields    []Field
-	Methods   []Method
-	Imports   []string
-}
-
-type Field struct {
-	Type string
-	Name string
-}
-
-type Method struct {
-	Name       string
-	ReturnType string
-	Params     []Param
-	Calls      []MethodCall // "Edges" of your graph
-}
-
-type Param struct {
-	Type string
-	Name string
-}
-
-type MethodCall struct {
-	Target string // e.g. "this.repo" or "service"
-	Method string // e.g. "persist"
-}
-
-func BuildFileGraph(file *pgk.FileScan, analyser LanguageAnalyser) (*ClassGraph, error) {
+func BuildFileGraph(file *pgk.FileScan, analyser LanguageAnalyser) (*model.ClassGraph, error) {
 	source, fileErr := convertFileScan(file)
 
 	if fileErr != nil {
@@ -48,7 +18,7 @@ func BuildFileGraph(file *pgk.FileScan, analyser LanguageAnalyser) (*ClassGraph,
 	parser := sitter.NewParser()
 	lang := analyser.GetLanguage()
 	parser.SetLanguage(lang)
-	graph := &ClassGraph{}
+	graph := &model.ClassGraph{}
 
 	tree, err := parser.ParseCtx(context.Background(), nil, source)
 
@@ -73,7 +43,7 @@ func BuildFileGraph(file *pgk.FileScan, analyser LanguageAnalyser) (*ClassGraph,
 		// If the field name is set, we assume the field is "complete"
 		if curField.Name != "" {
 			graph.Fields = append(graph.Fields, curField)
-			curField = Field{}
+			curField = model.Field{}
 		}
 	})
 
@@ -88,7 +58,7 @@ func BuildFileGraph(file *pgk.FileScan, analyser LanguageAnalyser) (*ClassGraph,
 			break
 		}
 		mNode := match.Captures[0].Node
-		method := Method{}
+		method := model.Method{}
 
 		// Map the method metadata (Name, ReturnType) using the analyzer
 		// This processes the tags like @method.name and @method.return
@@ -104,7 +74,7 @@ func BuildFileGraph(file *pgk.FileScan, analyser LanguageAnalyser) (*ClassGraph,
 			curParam := analyser.MapParam(tag, content)
 			if curParam.Name != "" {
 				method.Params = append(method.Params, curParam)
-				curParam = Param{}
+				curParam = model.Param{}
 			}
 		})
 
@@ -113,7 +83,7 @@ func BuildFileGraph(file *pgk.FileScan, analyser LanguageAnalyser) (*ClassGraph,
 			curCall := analyser.MapCall(tag, content)
 			if curCall.Method != "" {
 				method.Calls = append(method.Calls, curCall)
-				curCall = MethodCall{}
+				curCall = model.MethodCall{}
 			}
 		})
 

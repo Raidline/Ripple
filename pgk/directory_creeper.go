@@ -16,7 +16,7 @@ type FileScan struct {
 	Err   error
 }
 
-func Creep(dir string) (iter.Seq[*FileScan], error) {
+func CreepDir(dir string) (iter.Seq[*FileScan], error) {
 
 	return func(yield func(*FileScan) bool) {
 		filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {

@@ -2,6 +2,7 @@ package languages
 
 import (
 	"fmt"
+	"raidline/ripple/core/model"
 	"raidline/ripple/errors"
 	"strings"
 
@@ -28,10 +29,10 @@ type LanguageAnalyser interface {
 	GetCallQuery() string   // Query to find the calls that happen inside the method (depends on GetMethodQuery)
 
 	// Logic hooks for language-specific data mapping
-	MapMethod(tag, content string) Method   // Maps the Method definition
-	MapField(tag, content string) Field     // Maps the field
-	MapParam(tag, content string) Param     // Maps the param for a method
-	MapCall(tag, content string) MethodCall // Maps the call inside a method
+	MapMethod(tag, content string) model.Method   // Maps the Method definition
+	MapField(tag, content string) model.Field     // Maps the field
+	MapParam(tag, content string) model.Param     // Maps the param for a method
+	MapCall(tag, content string) model.MethodCall // Maps the call inside a method
 }
 
 func GetAnalyser(l Language) (LanguageAnalyser, error) {
@@ -80,8 +81,8 @@ func (j JavaAnalyzer) GetCallQuery() string {
 	return `(method_invocation object: (_)? @tgt name: (identifier) @meth)`
 }
 
-func (j JavaAnalyzer) MapMethod(tag, content string) Method {
-	m := Method{}
+func (j JavaAnalyzer) MapMethod(tag, content string) model.Method {
+	m := model.Method{}
 	if tag == "method.return" {
 		m.ReturnType = content
 	}
@@ -92,8 +93,8 @@ func (j JavaAnalyzer) MapMethod(tag, content string) Method {
 	return m
 }
 
-func (j JavaAnalyzer) MapField(tag, content string) Field {
-	f := Field{}
+func (j JavaAnalyzer) MapField(tag, content string) model.Field {
+	f := model.Field{}
 	if tag == "type" {
 		f.Type = content
 	}
@@ -104,8 +105,8 @@ func (j JavaAnalyzer) MapField(tag, content string) Field {
 	return f
 }
 
-func (j JavaAnalyzer) MapParam(tag, content string) Param {
-	p := Param{}
+func (j JavaAnalyzer) MapParam(tag, content string) model.Param {
+	p := model.Param{}
 	if tag == "t" {
 		p.Type = content
 	}
@@ -116,8 +117,8 @@ func (j JavaAnalyzer) MapParam(tag, content string) Param {
 	return p
 }
 
-func (j JavaAnalyzer) MapCall(tag, content string) MethodCall {
-	c := MethodCall{}
+func (j JavaAnalyzer) MapCall(tag, content string) model.MethodCall {
+	c := model.MethodCall{}
 	if tag == "tgt" {
 		c.Target = content
 	}
@@ -161,8 +162,8 @@ func (t TypeScriptAnalyzer) GetCallQuery() string {
 	return `(call_expression function: (member_expression object: (identifier) @tgt property: (property_identifier) @meth))`
 }
 
-func (t TypeScriptAnalyzer) MapMethod(tag, content string) Method {
-	m := Method{}
+func (t TypeScriptAnalyzer) MapMethod(tag, content string) model.Method {
+	m := model.Method{}
 	if tag == "method.name" {
 		m.Name = content
 	}
@@ -174,8 +175,8 @@ func (t TypeScriptAnalyzer) MapMethod(tag, content string) Method {
 	return m
 }
 
-func (t TypeScriptAnalyzer) MapField(tag, content string) Field {
-	f := Field{}
+func (t TypeScriptAnalyzer) MapField(tag, content string) model.Field {
+	f := model.Field{}
 	if tag == "name" {
 		f.Name = content
 	}
@@ -186,8 +187,8 @@ func (t TypeScriptAnalyzer) MapField(tag, content string) Field {
 	return f
 }
 
-func (t TypeScriptAnalyzer) MapParam(tag, content string) Param {
-	p := Param{}
+func (t TypeScriptAnalyzer) MapParam(tag, content string) model.Param {
+	p := model.Param{}
 	if tag == "n" {
 		p.Name = content
 	}
@@ -198,8 +199,8 @@ func (t TypeScriptAnalyzer) MapParam(tag, content string) Param {
 	return p
 }
 
-func (t TypeScriptAnalyzer) MapCall(tag, content string) MethodCall {
-	c := MethodCall{}
+func (t TypeScriptAnalyzer) MapCall(tag, content string) model.MethodCall {
+	c := model.MethodCall{}
 	if tag == "tgt" {
 		c.Target = content
 	}
