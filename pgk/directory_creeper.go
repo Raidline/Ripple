@@ -10,10 +10,10 @@ import (
 const SUPPORTED_EXTENSION = ".java"
 
 type FileScan struct {
-	dir   string
-	name  string
-	lines iter.Seq[string]
-	err   error
+	Dir   string
+	Name  string
+	Lines iter.Seq[string]
+	Err   error
 }
 
 func Creep(dir string) (iter.Seq[*FileScan], error) {
@@ -30,12 +30,12 @@ func Creep(dir string) (iter.Seq[*FileScan], error) {
 				fileLines, fileErr := readFile(path)
 
 				if fileErr != nil {
-					yield(&FileScan{dir: directory, name: d.Name(), lines: fileLines, err: fileErr})
+					yield(&FileScan{Dir: directory, Name: d.Name(), Lines: fileLines, Err: fileErr})
 
 					return nil
 				}
 
-				if !yield(&FileScan{dir: directory, name: d.Name(), lines: fileLines, err: nil}) {
+				if !yield(&FileScan{Dir: directory, Name: d.Name(), Lines: fileLines, Err: nil}) {
 					return nil
 				}
 			}

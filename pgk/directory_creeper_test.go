@@ -25,7 +25,7 @@ func TestCreep(t *testing.T) {
 		}
 
 		filesFound++
-		dirs[file.dir] = true
+		dirs[file.Dir] = true
 
 		for _ = range file.lines {
 			gotFiles = true
