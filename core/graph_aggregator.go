@@ -8,11 +8,15 @@ import (
 )
 
 type ProjectGraphAggregator struct {
-	graph *model.ProjectGraph
+	Graph *model.ProjectGraph
 }
 
 func Create() *ProjectGraphAggregator {
-	return &ProjectGraphAggregator{}
+	return &ProjectGraphAggregator{
+		Graph: &model.ProjectGraph{
+			Vertices: make(map[string]model.GraphVertice, 0),
+		},
+	}
 }
 
 func (agg *ProjectGraphAggregator) aggregate(rootDir string, lang string) error {
@@ -51,16 +55,24 @@ func (agg *ProjectGraphAggregator) aggregate(rootDir string, lang string) error 
 			return fileGErr
 		}
 
-		appErr := appendToCurrentGraph(fileGraph)
-
-		if appErr != nil {
-			return appErr
-		}
+		agg.appendToCurrentGraph(fileGraph)
 	}
 
 	return nil
 }
 
-func appendToCurrentGraph(fileGraph *model.ClassGraph) error {
-	panic("unimplemented")
+func (agg *ProjectGraphAggregator) appendToCurrentGraph(fileGraph *model.ClassGraph) {
+	if vertice, ok := agg.Graph.Vertices[fileGraph.ClassName]; ok {
+		connectEdges(vertice, fileGraph)
+	} else {
+		v := model.GraphVertice{}
+		v.Node = fileGraph
+		connectEdges(v, fileGraph)
+		// todo(the fields and method info to get the weight of each import)
+		agg.Graph.Vertices[fileGraph.ClassName] = v
+	}
+}
+
+func connectEdges(v1 model.GraphVertice, fileGraph *model.ClassGraph) {
+
 }

@@ -3,12 +3,18 @@ package model
 // --- Graph Structures ---
 
 type GraphEdge struct {
-	To     *ClassGraph
-	Weight int // this is not used at the moment - but will be used to know how much depedency there is between both
+	To     *ClassGraph // where it is connected to
+	From   *ClassGraph // where it came from
+	Weight int         // this is not used at the moment - but will be used to know how much depedency there is between both
+}
+
+type GraphVertice struct {
+	Node  *ClassGraph
+	Edges []GraphEdge
 }
 
 type ProjectGraph struct {
-	Graph [][]GraphEdge
+	Vertices map[string]GraphVertice
 }
 
 type ClassGraph struct {
@@ -19,7 +25,7 @@ type ClassGraph struct {
 }
 
 type Field struct {
-	Type string
+	Type string // to know if it is a dependency it needs to be in the imports
 	Name string
 }
 
