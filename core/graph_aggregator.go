@@ -25,7 +25,7 @@ func Create() *ProjectGraphAggregator {
 	}
 }
 
-func (agg *ProjectGraphAggregator) aggregate(rootDir string, lang string) error {
+func (agg *ProjectGraphAggregator) Aggregate(rootDir string, lang string) error {
 
 	var languageErr error
 	var wantedLang languages.Language
@@ -54,34 +54,59 @@ func (agg *ProjectGraphAggregator) aggregate(rootDir string, lang string) error 
 		return e
 	}
 
+	fileNameToFileScan := make(map[string]*pgk.FileScan, 0)
+
 	for file := range files {
+		fileNameToFileScan[file.Name] = file
+	}
 
-		fileGraph, fileGErr := languages.BuildFileGraph(file, fileAnalyser)
+	agg.createProjectGraph(fileNameToFileScan, fileAnalyser, wantedLang)
 
-		if fileGErr != nil {
-			return fileGErr
-		}
+	return nil
+}
 
-		agg.appendToCurrentGraph(wantedLang, fileGraph)
+func (agg *ProjectGraphAggregator) createProjectGraph(
+	fileToScan map[string]*pgk.FileScan,
+	fileAnalyser languages.LanguageAnalyser,
+	wantedLang languages.Language) error {
+
+	for _, file := range fileToScan {
+		agg.createGraphForFile(file, fileToScan, fileAnalyser, wantedLang)
 	}
 
 	return nil
 }
 
-func (agg *ProjectGraphAggregator) appendToCurrentGraph(lang languages.Language, fileGraph *model.ClassGraph) {
+func (agg *ProjectGraphAggregator) createGraphForFile(fileName *pgk.FileScan, fileToScan map[string]*pgk.FileScan,
+	fileAnalyser languages.LanguageAnalyser,
+	wantedLang languages.Language) (*model.ClassGraph, error) {
+
+	fileGraph, fileGErr := languages.BuildFileGraph(fileName, fileAnalyser)
+
+	if fileGErr != nil {
+		return nil, fileGErr
+	}
+
 	if vertice, ok := agg.Graph.Vertices[fileGraph.ClassName]; !ok {
-		agg.connectEdgesToVertice(lang, vertice, fileGraph) // this might already exist but as a from dependency, now we need to add the to's
+		// this might already exist but as a from dependency, now we need to add the to's
+		agg.connectEdgesToVertice(wantedLang, vertice, fileGraph, func(depName string) (*model.ClassGraph, error) {
+			return agg.createGraphForFile(fileToScan[depName], fileToScan, fileAnalyser, wantedLang)
+		})
 	} else {
 		v := model.GraphVertice{}
 		v.Node = fileGraph
-		agg.connectEdgesToVertice(lang, v, fileGraph)
+		agg.connectEdgesToVertice(wantedLang, v, fileGraph, func(depName string) (*model.ClassGraph, error) {
+			return agg.createGraphForFile(fileToScan[depName], fileToScan, fileAnalyser, wantedLang)
+		})
 		// todo(the fields and method info to get the weight of each import)
 		agg.Graph.Vertices[fileGraph.ClassName] = v
 	}
+
+	return fileGraph, nil
 }
 
 func (agg *ProjectGraphAggregator) connectEdgesToVertice(lang languages.Language,
-	v1 model.GraphVertice, fileGraph *model.ClassGraph) error {
+	v1 model.GraphVertice, fileGraph *model.ClassGraph, cb func(depName string) (*model.ClassGraph, error)) error {
 
 	projectImports := make([]string, len(fileGraph.Imports)) // all the project imports ready to go
 	if breakSimbol, ok := packageBreakerSimbols[lang]; ok {
@@ -103,7 +128,18 @@ func (agg *ProjectGraphAggregator) connectEdgesToVertice(lang languages.Language
 				Weight: 0, // should be the count of times this import is used
 			})
 		} else {
-			//todo: build the file, we need to call this in a recursive manner, refactor the method after. break it into smaller pieces
+			//build the file
+			n, e := cb(v)
+
+			if e != nil {
+				return e
+			}
+
+			v1.Edges = append(v1.Edges, model.GraphEdge{
+				To:     n,
+				From:   fileGraph,
+				Weight: 0, // should be the count of times this import is used
+			})
 		}
 	}
 

@@ -2,6 +2,7 @@ package com.bmw.trip.dips.application.service;
 
 import com.bmw.trip.dips.domain.shared.TechnologyStructureZone;
 import com.bmw.trip.dips.infrastructure.entity.InspectionZone;
+import com.bmw.trip.dips.infrastructure.entity.SecondService;
 import com.bmw.trip.dips.infrastructure.repository.InspectionZoneRepository;
 import jakarta.enterprise.context.ApplicationScoped;
 import java.util.ArrayList;
@@ -15,9 +16,14 @@ import java.util.stream.Collectors;
 public class InspectionZoneService {
 
     private final InspectionZoneRepository repository;
+    private final SecondService s;
 
-    public InspectionZoneService(InspectionZoneRepository repository) {
+    public InspectionZoneService(
+        InspectionZoneRepository repository,
+        SecondService s
+    ) {
         this.repository = repository;
+        this.s = s;
     }
 
     public void updateZoneReferences(List<TechnologyStructureZone> zones) {
