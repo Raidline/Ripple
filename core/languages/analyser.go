@@ -22,25 +22,25 @@ const (
 type LanguageAnalyser interface {
 	GetLanguage() *sitter.Language
 	// Queries
-	GetStructQuery() string // Query to find the struct of the file (class name & imports)
-	GetFieldQuery() string  // Query to find the fields of the file
-	GetMethodQuery() string // Query to find the method nodes
-	GetParamQuery() string  // Query to find the params of the method (depends on GetMethodQuery)
-	GetCallQuery() string   // Query to find the calls that happen inside the method (depends on GetMethodQuery)
+	GetStructQuery() *sitter.Query // Query to find the struct of the file (class name & imports)
+	GetFieldQuery() *sitter.Query  // Query to find the fields of the file
+	GetMethodQuery() *sitter.Query // Query to find the method nodes
+	GetParamQuery() *sitter.Query  // Query to find the params of the method (depends on GetMethodQuery)
+	GetCallQuery() *sitter.Query   // Query to find the calls that happen inside the method (depends on GetMethodQuery)
 
 	// Logic hooks for language-specific data mapping
-	MapMethod(tag, content string) model.Method   // Maps the Method definition
-	MapField(tag, content string) model.Field     // Maps the field
-	MapParam(tag, content string) model.Param     // Maps the param for a method
-	MapCall(tag, content string) model.MethodCall // Maps the call inside a method
+	MapMethod(tag, content string, m *model.Method)   // Maps the Method definition
+	MapField(tag, content string, f *model.Field)     // Maps the field
+	MapParam(tag, content string, p *model.Param)     // Maps the param for a method
+	MapCall(tag, content string, c *model.MethodCall) // Maps the call inside a method
 }
 
 func GetAnalyser(l Language) (LanguageAnalyser, error) {
 	switch l {
 	case JAVA:
-		return &JavaAnalyzer{}, nil
+		return newJavaAnalyzer(), nil
 	case TS:
-		return &TypeScriptAnalyzer{}, nil
+		return newTypescriptAnalyser(), nil
 	}
 
 	return nil, &errors.LanguageNotFoundError{
@@ -50,163 +50,204 @@ func GetAnalyser(l Language) (LanguageAnalyser, error) {
 	}
 }
 
-type JavaAnalyzer struct{}
-
-func (j JavaAnalyzer) GetLanguage() *sitter.Language { return java.GetLanguage() }
-
-func (j JavaAnalyzer) GetStructQuery() string {
-	return `
-		(class_declaration name: (identifier) @class.name)
-		(import_declaration (scoped_identifier) @import)
-	`
+type JavaAnalyzer struct {
+	lang        *sitter.Language
+	structQuery *sitter.Query
+	fieldQuery  *sitter.Query
+	methodQuery *sitter.Query
+	paramQuery  *sitter.Query
+	callQuery   *sitter.Query
 }
 
-func (j JavaAnalyzer) GetFieldQuery() string {
-	return `
-		(field_declaration
-			type: [(type_identifier) (primitive_type)] @type
-			declarator: (variable_declarator name: (identifier) @name))
-	`
+func newJavaAnalyzer() *JavaAnalyzer {
+	l := java.GetLanguage()
+	sQ, sErr := sitter.NewQuery([]byte(`(class_declaration name: (identifier) @class.name)
+	(import_declaration (scoped_identifier) @import)`), l)
+	fQ, fErr := sitter.NewQuery([]byte(`(field_declaration
+				type: (_) @type
+				declarator: (variable_declarator name: (identifier) @name))`), l)
+	mQ, mErr := sitter.NewQuery([]byte(`(method_declaration
+				type: (_) @method.return
+				name: (identifier) @method.name) @m`), l)
+	pQ, pErr := sitter.NewQuery([]byte(`(formal_parameter type: (_) @t name: (identifier) @n)`), l)
+	cQ, cErr := sitter.NewQuery([]byte(`(method_invocation object: (_)? @tgt name: (identifier) @meth)`), l)
+
+	if sErr != nil {
+		panic(fmt.Errorf("Structure query could not be formed : [%s]", sErr.Error()))
+	}
+
+	if fErr != nil {
+		panic(fmt.Errorf("Field query could not be formed : [%s]", fErr.Error()))
+	}
+
+	if mErr != nil {
+		panic(fmt.Errorf("Method query could not be formed : [%s]", mErr.Error()))
+	}
+
+	if pErr != nil {
+		panic(fmt.Errorf("Sub Method query Param Query could not be formed : [%s]", pErr.Error()))
+	}
+
+	if cErr != nil {
+		panic(fmt.Errorf("Sub Method query Call Query could not be formed : [%s]", cErr.Error()))
+	}
+
+	return &JavaAnalyzer{
+		lang:        l,
+		structQuery: sQ,
+		fieldQuery:  fQ,
+		methodQuery: mQ,
+		paramQuery:  pQ,
+		callQuery:   cQ,
+	}
 }
 
-func (j JavaAnalyzer) GetMethodQuery() string {
-	return `(method_declaration type: [(type_identifier) (primitive_type)] @method.return name: (identifier) @method.name) @m`
+func (j *JavaAnalyzer) GetLanguage() *sitter.Language { return java.GetLanguage() }
+
+func (j *JavaAnalyzer) GetStructQuery() *sitter.Query {
+	return j.structQuery
 }
 
-func (j JavaAnalyzer) GetParamQuery() string {
-	return `(formal_parameter type: [(type_identifier) (primitive_type)] @t name: (identifier) @n)`
+func (j *JavaAnalyzer) GetFieldQuery() *sitter.Query {
+	return j.fieldQuery
 }
 
-func (j JavaAnalyzer) GetCallQuery() string {
-	return `(method_invocation object: (_)? @tgt name: (identifier) @meth)`
+func (j *JavaAnalyzer) GetMethodQuery() *sitter.Query {
+	return j.methodQuery
 }
 
-func (j JavaAnalyzer) MapMethod(tag, content string) model.Method {
-	m := model.Method{}
-	if tag == "method.return" {
+func (j *JavaAnalyzer) GetParamQuery() *sitter.Query {
+	return j.paramQuery
+}
+
+func (j *JavaAnalyzer) GetCallQuery() *sitter.Query {
+	return j.callQuery
+}
+
+func (j *JavaAnalyzer) MapMethod(tag, content string, m *model.Method) {
+	switch tag {
+	case "method.return":
 		m.ReturnType = content
-	}
-	if tag == "method.name" {
+	case "method.name":
 		m.Name = content
 	}
-
-	return m
 }
 
-func (j JavaAnalyzer) MapField(tag, content string) model.Field {
-	f := model.Field{}
-	if tag == "type" {
+func (j *JavaAnalyzer) MapField(tag, content string, f *model.Field) {
+	switch tag {
+	case "type":
 		f.Type = content
-	}
-	if tag == "name" {
+	case "name":
 		f.Name = content
 	}
-
-	return f
 }
 
-func (j JavaAnalyzer) MapParam(tag, content string) model.Param {
-	p := model.Param{}
-	if tag == "t" {
+func (j *JavaAnalyzer) MapParam(tag, content string, p *model.Param) {
+	switch tag {
+	case "t":
 		p.Type = content
-	}
-	if tag == "n" {
+	case "n":
 		p.Name = content
 	}
-
-	return p
 }
 
-func (j JavaAnalyzer) MapCall(tag, content string) model.MethodCall {
-	c := model.MethodCall{}
-	if tag == "tgt" {
+func (j *JavaAnalyzer) MapCall(tag, content string, c *model.MethodCall) {
+	switch tag {
+	case "tgt":
 		c.Target = content
-	}
-	if tag == "meth" {
+	case "meth":
 		c.Method = content
 	}
-
-	return c
 }
 
-type TypeScriptAnalyzer struct{}
-
-func (t TypeScriptAnalyzer) GetLanguage() *sitter.Language { return typescript.GetLanguage() }
-
-func (t TypeScriptAnalyzer) GetStructQuery() string {
-	return `
-		(class_declaration name: (type_identifier) @class.name)
-		(import_statement (import_clause (named_imports (import_specifier name: (identifier) @import))))
-	`
+type TypeScriptAnalyzer struct {
+	lang        *sitter.Language
+	structQuery *sitter.Query
+	fieldQuery  *sitter.Query
+	methodQuery *sitter.Query
+	paramQuery  *sitter.Query
+	callQuery   *sitter.Query
 }
 
-func (t TypeScriptAnalyzer) GetFieldQuery() string {
-	return `
-		(public_field_definition
-			name: (property_identifier) @name
-			type: (type_annotation (type_identifier) @type))
-	`
-}
-
-func (t TypeScriptAnalyzer) GetMethodQuery() string {
+func newTypescriptAnalyser() *TypeScriptAnalyzer {
+	l := typescript.GetLanguage()
+	sQ, _ := sitter.NewQuery([]byte(`(class_declaration name: (type_identifier) @class.name)
+	(import_statement (import_clause (named_imports (import_specifier name: (identifier) @import))))`), l)
+	fQ, _ := sitter.NewQuery([]byte(`(public_field_definition
+		name: (property_identifier) @name
+		type: (type_annotation (type_identifier) @type))`), l)
 	// In TS, return type is inside a type_annotation after the parameters
-	return `(method_definition name: (property_identifier) @method.name return_type: (type_annotation)? @method.return) @m`
-}
-
-func (t TypeScriptAnalyzer) GetParamQuery() string {
-	return `(formal_parameter name: (identifier) @n type: (type_annotation (type_identifier) @t)?)`
-}
-
-func (t TypeScriptAnalyzer) GetCallQuery() string {
+	mQ, _ := sitter.NewQuery([]byte(`(method_definition name: (property_identifier) @method.name return_type: (type_annotation)? @method.return) @m`), l)
+	pQ, _ := sitter.NewQuery([]byte(`(formal_parameter name: (identifier) @n type: (type_annotation (type_identifier) @t)?)`), l)
 	// TS calls look like object.method() or just method()
-	return `(call_expression function: (member_expression object: (identifier) @tgt property: (property_identifier) @meth))`
+	cQ, _ := sitter.NewQuery([]byte(`(call_expression function: (member_expression object: (identifier) @tgt property: (property_identifier) @meth))`), l)
+
+	return &TypeScriptAnalyzer{
+		lang:        l,
+		structQuery: sQ,
+		fieldQuery:  fQ,
+		methodQuery: mQ,
+		paramQuery:  pQ,
+		callQuery:   cQ,
+	}
 }
 
-func (t TypeScriptAnalyzer) MapMethod(tag, content string) model.Method {
-	m := model.Method{}
-	if tag == "method.name" {
+func (t *TypeScriptAnalyzer) GetLanguage() *sitter.Language { return typescript.GetLanguage() }
+
+func (t *TypeScriptAnalyzer) GetStructQuery() *sitter.Query {
+	return t.structQuery
+}
+
+func (t *TypeScriptAnalyzer) GetFieldQuery() *sitter.Query {
+	return t.fieldQuery
+}
+
+func (t *TypeScriptAnalyzer) GetMethodQuery() *sitter.Query {
+	// In TS, return type is inside a type_annotation after the parameters
+	return t.methodQuery
+}
+
+func (t *TypeScriptAnalyzer) GetParamQuery() *sitter.Query {
+	return t.paramQuery
+}
+
+func (t *TypeScriptAnalyzer) GetCallQuery() *sitter.Query {
+	// TS calls look like object.method() or just method()
+	return t.callQuery
+}
+
+func (t *TypeScriptAnalyzer) MapMethod(tag, content string, m *model.Method) {
+	switch tag {
+	case "method.name":
 		m.Name = content
+	case "method.return":
+		m.ReturnType = strings.TrimSpace(strings.TrimPrefix(content, ":")) // Remove the ":" from ": string"
 	}
-	if tag == "method.return" {
-		// Remove the ":" from ": string"
-		m.ReturnType = strings.TrimSpace(strings.TrimPrefix(content, ":"))
-	}
-
-	return m
 }
 
-func (t TypeScriptAnalyzer) MapField(tag, content string) model.Field {
-	f := model.Field{}
-	if tag == "name" {
+func (t *TypeScriptAnalyzer) MapField(tag, content string, f *model.Field) {
+	switch tag {
+	case "name":
 		f.Name = content
-	}
-	if tag == "type" {
+	case "type":
 		f.Type = content
 	}
-
-	return f
 }
 
-func (t TypeScriptAnalyzer) MapParam(tag, content string) model.Param {
-	p := model.Param{}
-	if tag == "n" {
+func (t *TypeScriptAnalyzer) MapParam(tag, content string, p *model.Param) {
+	switch tag {
+	case "n":
 		p.Name = content
-	}
-	if tag == "t" {
+	case "t":
 		p.Type = content
 	}
-
-	return p
 }
 
-func (t TypeScriptAnalyzer) MapCall(tag, content string) model.MethodCall {
-	c := model.MethodCall{}
-	if tag == "tgt" {
+func (t *TypeScriptAnalyzer) MapCall(tag, content string, c *model.MethodCall) {
+	switch tag {
+	case "tgt":
 		c.Target = content
-	}
-	if tag == "meth" {
+	case "meth":
 		c.Method = content
 	}
-
-	return c
 }

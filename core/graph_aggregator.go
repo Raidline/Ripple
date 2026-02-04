@@ -110,11 +110,11 @@ func (agg *ProjectGraphAggregator) connectEdgesToVertice(lang languages.Language
 
 	projectImports := make([]string, len(fileGraph.Imports)) // all the project imports ready to go
 	if breakSimbol, ok := packageBreakerSimbols[lang]; ok {
-		for _, v := range fileGraph.Imports {
+		for i, v := range fileGraph.Imports {
 			splitted := strings.Split(v, breakSimbol)
 
 			impName := splitted[len(splitted)-1] //here we trust that this is a project dependency
-			projectImports = append(projectImports, impName)
+			projectImports[i] = impName
 		}
 	} else {
 		return errors.NewLanguageNotSupportedError(string(lang))
@@ -129,7 +129,7 @@ func (agg *ProjectGraphAggregator) connectEdgesToVertice(lang languages.Language
 			})
 		} else {
 			//build the file
-			n, e := cb(v)
+			n, e := cb(v) //todo: this is not working for some reason
 
 			if e != nil {
 				return e

@@ -16,41 +16,38 @@ func BuildFileGraph(file *pgk.FileScan, analyser LanguageAnalyser) (*model.Class
 	}
 
 	parser := sitter.NewParser()
-	lang := analyser.GetLanguage()
-	parser.SetLanguage(lang)
-	graph := &model.ClassGraph{}
-
+	parser.SetLanguage(analyser.GetLanguage())
 	tree, err := parser.ParseCtx(context.Background(), nil, source)
-
 	if err != nil {
 		return nil, err
 	}
-
 	root := tree.RootNode()
+	graph := &model.ClassGraph{}
 
-	execQuery(analyser.GetStructQuery(), root, lang, source, func(tag, content string, n *sitter.Node) {
-		if tag == "class.name" {
+	qc := sitter.NewQueryCursor()
+	defer qc.Close()
+
+	runQuery(analyser.GetStructQuery(), root, source, func(tag, content string, n *sitter.Node) {
+		switch tag {
+		case "class.name":
 			graph.ClassName = content
-		}
-
-		//todo: we should only return here the classes that matter, filter out std imports
-		if tag == "import" {
+		case "import": //todo: we should only return here the classes that matter, filter out std imports
 			graph.Imports = append(graph.Imports, content)
 		}
 	})
 
-	execQuery(analyser.GetFieldQuery(), root, lang, source, func(tag, content string, n *sitter.Node) {
-		curField := analyser.MapField(tag, content)
+	curField := model.Field{}
+
+	runQuery(analyser.GetFieldQuery(), root, source, func(tag, content string, n *sitter.Node) {
+		analyser.MapField(tag, content, &curField)
 		// If the field name is set, we assume the field is "complete"
 		if curField.Name != "" {
 			graph.Fields = append(graph.Fields, curField)
-			curField = model.Field{}
+			curField.Name = ""
 		}
 	})
 
-	// 3. Methods
-	mQuery, _ := sitter.NewQuery([]byte(analyser.GetMethodQuery()), analyser.GetLanguage())
-	qc := sitter.NewQueryCursor()
+	mQuery := analyser.GetMethodQuery()
 	qc.Exec(mQuery, root)
 
 	for {
@@ -62,31 +59,34 @@ func BuildFileGraph(file *pgk.FileScan, analyser LanguageAnalyser) (*model.Class
 		method := model.Method{}
 
 		// Map the method metadata (Name, ReturnType) using the analyzer
-		// This processes the tags like @method.name and @method.return
 		for _, capture := range match.Captures {
 			tag := mQuery.CaptureNameForId(capture.Index)
-			content := capture.Node.Content(source)
-			method = analyser.MapMethod(tag, content)
+			content := string(source[capture.Node.StartByte():capture.Node.EndByte()])
+			analyser.MapMethod(tag, content, &method)
 		}
 
-		// Internal: Params
-		execQuery(analyser.GetParamQuery(), mNode, lang, source, func(tag, content string, n *sitter.Node) {
+		if mNode != nil {
+			// Internal: Params
+			curParam := model.Param{}
+			curCall := model.MethodCall{}
+			runQuery(analyser.GetParamQuery(), mNode, source, func(tag, content string, n *sitter.Node) {
 
-			curParam := analyser.MapParam(tag, content)
-			if curParam.Name != "" {
-				method.Params = append(method.Params, curParam)
-				curParam = model.Param{}
-			}
-		})
+				analyser.MapParam(tag, content, &curParam)
+				if curParam.Name != "" {
+					method.Params = append(method.Params, curParam)
+					curParam.Name = ""
+				}
+			})
 
-		// Internal: Calls
-		execQuery(analyser.GetCallQuery(), mNode, lang, source, func(tag, content string, n *sitter.Node) {
-			curCall := analyser.MapCall(tag, content)
-			if curCall.Method != "" {
-				method.Calls = append(method.Calls, curCall)
-				curCall = model.MethodCall{}
-			}
-		})
+			// Internal: Calls
+			runQuery(analyser.GetCallQuery(), mNode, source, func(tag, content string, n *sitter.Node) {
+				analyser.MapCall(tag, content, &curCall)
+				if curCall.Method != "" {
+					method.Calls = append(method.Calls, curCall)
+					curCall.Method = ""
+				}
+			})
+		}
 
 		graph.Methods = append(graph.Methods, method)
 	}
@@ -107,28 +107,22 @@ func convertFileScan(file *pgk.FileScan) ([]byte, error) {
 	return source, nil
 }
 
-func execQuery(qStr string, node *sitter.Node,
-	lang *sitter.Language,
-	source []byte, cb func(tag, content string, n *sitter.Node)) {
-	q, err := sitter.NewQuery([]byte(qStr), lang)
-	if err != nil {
+func runQuery(q *sitter.Query, node *sitter.Node, source []byte, cb func(tag, content string, n *sitter.Node)) {
+	if q == nil {
 		return
 	}
-	defer q.Close()
-
 	qc := sitter.NewQueryCursor()
 	defer qc.Close()
 	qc.Exec(q, node)
-
 	for {
 		match, ok := qc.NextMatch()
 		if !ok {
 			break
 		}
-		for _, capture := range match.Captures {
-			tag := q.CaptureNameForId(capture.Index)
-			content := capture.Node.Content(source)
-			cb(tag, content, capture.Node)
+		for _, cap := range match.Captures {
+			tag := q.CaptureNameForId(cap.Index)
+			content := string(source[cap.Node.StartByte():cap.Node.EndByte()])
+			cb(tag, content, cap.Node)
 		}
 	}
 }
