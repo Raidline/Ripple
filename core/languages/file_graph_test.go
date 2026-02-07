@@ -17,7 +17,7 @@ func TestBuildFileGraph(t *testing.T) {
 	var foundFile *pgk.FileScan
 
 	for f := range files {
-		if f.Name == "InspectionZoneService.java" {
+		if f.Name == "InspectionZoneService" {
 			foundFile = f
 		}
 	}
@@ -46,8 +46,8 @@ func TestBuildFileGraph(t *testing.T) {
 		t.FailNow()
 	}
 
-	if len(graph.Imports) != 11 {
-		t.Errorf("File should have 11 imports, not : [%d]", len(graph.Imports))
+	if len(graph.Imports) != 4 {
+		t.Errorf("File should have 4 non std imports, not : [%d]", len(graph.Imports))
 		t.FailNow()
 	}
 

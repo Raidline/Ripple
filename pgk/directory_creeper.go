@@ -7,6 +7,8 @@ import (
 	"strings"
 )
 
+//todo: add support for TS and modify sanitize filename
+
 const SUPPORTED_EXTENSION = ".java"
 
 type FileScan struct {
@@ -30,12 +32,12 @@ func CreepDir(dir string) (iter.Seq[*FileScan], error) {
 				fileLines, fileErr := readFile(path)
 
 				if fileErr != nil {
-					yield(&FileScan{Dir: directory, Name: d.Name(), Lines: fileLines, Err: fileErr})
+					yield(&FileScan{Dir: directory, Name: sanitizeFileName(d.Name()), Lines: fileLines, Err: fileErr})
 
 					return nil
 				}
 
-				if !yield(&FileScan{Dir: directory, Name: d.Name(), Lines: fileLines, Err: nil}) {
+				if !yield(&FileScan{Dir: directory, Name: sanitizeFileName(d.Name()), Lines: fileLines, Err: nil}) {
 					return nil
 				}
 			}
@@ -49,4 +51,10 @@ func extractDirFromPath(path string) string {
 	splitted := strings.Split(path, "/")
 
 	return splitted[len(splitted)-2] //returns the last dir
+}
+
+func sanitizeFileName(filename string) string {
+	splitted := strings.Split(filename, ".")
+
+	return splitted[0]
 }

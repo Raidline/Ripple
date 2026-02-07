@@ -33,6 +33,9 @@ type LanguageAnalyser interface {
 	MapField(tag, content string, f *model.Field)     // Maps the field
 	MapParam(tag, content string, p *model.Param)     // Maps the param for a method
 	MapCall(tag, content string, c *model.MethodCall) // Maps the call inside a method
+
+	//Language helper specific logic
+	IsProjectImport(content string) bool
 }
 
 func GetAnalyser(l Language) (LanguageAnalyser, error) {
@@ -51,12 +54,13 @@ func GetAnalyser(l Language) (LanguageAnalyser, error) {
 }
 
 type JavaAnalyzer struct {
-	lang        *sitter.Language
-	structQuery *sitter.Query
-	fieldQuery  *sitter.Query
-	methodQuery *sitter.Query
-	paramQuery  *sitter.Query
-	callQuery   *sitter.Query
+	lang             *sitter.Language
+	structQuery      *sitter.Query
+	fieldQuery       *sitter.Query
+	methodQuery      *sitter.Query
+	paramQuery       *sitter.Query
+	callQuery        *sitter.Query
+	externalPrefixes []string //number of packages it need to match to count as project import
 }
 
 func newJavaAnalyzer() *JavaAnalyzer {
@@ -99,6 +103,15 @@ func newJavaAnalyzer() *JavaAnalyzer {
 		methodQuery: mQ,
 		paramQuery:  pQ,
 		callQuery:   cQ,
+		externalPrefixes: []string{
+			"java.",
+			"javax.",
+			"jakarta.",
+			"org.springframework.",
+			"com.google.",
+			"org.apache.",
+			"junit.",
+		},
 	}
 }
 
@@ -158,6 +171,16 @@ func (j *JavaAnalyzer) MapCall(tag, content string, c *model.MethodCall) {
 	case "meth":
 		c.Method = content
 	}
+}
+
+func (j *JavaAnalyzer) IsProjectImport(content string) bool {
+	//Probably a better way to do this than to hammer the prefixes
+	for _, prefix := range j.externalPrefixes {
+		if strings.HasPrefix(content, prefix) {
+			return false
+		}
+	}
+	return true
 }
 
 type TypeScriptAnalyzer struct {
@@ -250,4 +273,9 @@ func (t *TypeScriptAnalyzer) MapCall(tag, content string, c *model.MethodCall) {
 	case "meth":
 		c.Method = content
 	}
+}
+
+func (t *TypeScriptAnalyzer) IsProjectImport(content string) bool {
+	// In TS, local files are almost always relative paths
+	return strings.HasPrefix(content, ".") || strings.HasPrefix(content, "..")
 }

@@ -1,6 +1,7 @@
 package com.bmw.trip.dips.application.service;
 
 import java.util.List;
+import com.bmw.trip.dips.infrastructure.service.InspectionZoneService;
 
 @ApplicationScoped
 public class SecondService {

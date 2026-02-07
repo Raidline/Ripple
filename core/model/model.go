@@ -14,7 +14,7 @@ type GraphVertice struct {
 }
 
 type ProjectGraph struct {
-	Vertices map[string]GraphVertice
+	Vertices map[string]*GraphVertice
 }
 
 type ClassGraph struct {

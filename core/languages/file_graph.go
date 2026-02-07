@@ -31,8 +31,10 @@ func BuildFileGraph(file *pgk.FileScan, analyser LanguageAnalyser) (*model.Class
 		switch tag {
 		case "class.name":
 			graph.ClassName = content
-		case "import": //todo: we should only return here the classes that matter, filter out std imports
-			graph.Imports = append(graph.Imports, content)
+		case "import":
+			if analyser.IsProjectImport(content) {
+				graph.Imports = append(graph.Imports, content)
+			}
 		}
 	})
 
