@@ -29,8 +29,8 @@ func TestAggregate(t *testing.T) {
 	}
 
 	if v, ok := agg.Graph.Vertices["SecondService"]; ok {
-		if len(v.Edges) != 1 {
-			t.Errorf("Should be able to have 1 Edge in the graph for SecondService: %d", len(v.Edges))
+		if len(v.Edges) != 2 {
+			t.Errorf("Should be able to have 2 Edge in the graph for SecondService: %d", len(v.Edges))
 			t.FailNow()
 		}
 	} else {

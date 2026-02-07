@@ -107,6 +107,7 @@ func newJavaAnalyzer() *JavaAnalyzer {
 			"java.",
 			"javax.",
 			"jakarta.",
+			"io.quarkus",
 			"org.springframework.",
 			"com.google.",
 			"org.apache.",
