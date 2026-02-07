@@ -1,12 +1,18 @@
-package core
+package graph
 
-import "testing"
+import (
+	"raidline/ripple/core/graph/languages"
+	"raidline/ripple/pgk"
+	"testing"
+)
 
 func TestAggregate(t *testing.T) {
 
 	agg := Create()
 
-	e := agg.Aggregate("../resources/test-files", "java")
+	creepResult, _ := pgk.CreepDir("../../resources/test-files")
+
+	e := agg.Aggregate(creepResult.Files, languages.JAVA)
 
 	if e != nil {
 		t.Errorf("Should be able to construct Graph : %s", e.Error())

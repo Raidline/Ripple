@@ -2,18 +2,14 @@ package languages
 
 import (
 	"context"
-	"raidline/ripple/core/model"
+	"raidline/ripple/core/graph/model"
 	"raidline/ripple/pgk"
 
 	sitter "github.com/smacker/go-tree-sitter"
 )
 
 func BuildFileGraph(file *pgk.FileScan, analyser LanguageAnalyser) (*model.ClassGraph, error) {
-	source, fileErr := convertFileScan(file)
-
-	if fileErr != nil {
-		return nil, fileErr
-	}
+	source := convertFileScan(file)
 
 	parser := sitter.NewParser()
 	parser.SetLanguage(analyser.GetLanguage())
@@ -95,18 +91,14 @@ func BuildFileGraph(file *pgk.FileScan, analyser LanguageAnalyser) (*model.Class
 	return graph, nil
 }
 
-func convertFileScan(file *pgk.FileScan) ([]byte, error) {
-	if file.Err != nil {
-		return nil, file.Err
-	}
-
+func convertFileScan(file *pgk.FileScan) []byte {
 	var source []byte
 
 	for line := range file.Lines {
 		source = append(source, []byte(line)...)
 	}
 
-	return source, nil
+	return source
 }
 
 func runQuery(q *sitter.Query, node *sitter.Node, source []byte, cb func(tag, content string, n *sitter.Node)) {

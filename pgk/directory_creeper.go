@@ -15,35 +15,43 @@ type FileScan struct {
 	Dir   string
 	Name  string
 	Lines iter.Seq[string]
-	Err   error
 }
 
-func CreepDir(dir string) (iter.Seq[*FileScan], error) {
+type CreepScanResult struct {
+	Dirs  []string
+	Files []*FileScan
+}
 
-	return func(yield func(*FileScan) bool) {
-		filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
-			if err != nil {
-				return err
+func CreepDir(dir string) (*CreepScanResult, error) {
+
+	dirs := make([]string, 0)
+	files := make([]*FileScan, 0)
+	filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		directory := extractDirFromPath(path)
+
+		// Don't watch the .git folder! It changes constantly and will melt your CPU.
+		if d.IsDir() && !strings.Contains(path, ".git") {
+			dirs = append(dirs, path)
+		} else if !d.IsDir() && strings.HasSuffix(d.Name(), SUPPORTED_EXTENSION) {
+			fileLines, fileErr := readFile(path)
+
+			if fileErr != nil {
+				return fileErr
 			}
 
-			directory := extractDirFromPath(path)
+			files = append(files, &FileScan{Dir: directory, Name: sanitizeFileName(d.Name()), Lines: fileLines})
+		}
 
-			if !d.IsDir() && strings.HasSuffix(d.Name(), SUPPORTED_EXTENSION) {
-				fileLines, fileErr := readFile(path)
+		return nil
+	})
 
-				if fileErr != nil {
-					yield(&FileScan{Dir: directory, Name: sanitizeFileName(d.Name()), Lines: fileLines, Err: fileErr})
-
-					return nil
-				}
-
-				if !yield(&FileScan{Dir: directory, Name: sanitizeFileName(d.Name()), Lines: fileLines, Err: nil}) {
-					return nil
-				}
-			}
-
-			return nil
-		})
+	return &CreepScanResult{
+		Dirs:  dirs,
+		Files: files,
 	}, nil
 }
 

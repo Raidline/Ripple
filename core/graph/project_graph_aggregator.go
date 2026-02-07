@@ -1,8 +1,8 @@
-package core
+package graph
 
 import (
-	"raidline/ripple/core/languages"
-	"raidline/ripple/core/model"
+	"raidline/ripple/core/graph/languages"
+	"raidline/ripple/core/graph/model"
 	"raidline/ripple/errors"
 	"raidline/ripple/pgk"
 )
@@ -24,27 +24,10 @@ func Create() *ProjectGraphAggregator {
 	}
 }
 
-func (agg *ProjectGraphAggregator) Aggregate(rootDir string, lang string) error {
+func (agg *ProjectGraphAggregator) Aggregate(files []*pgk.FileScan, wantedLang languages.Language) error {
 
-	var languageErr error
-	var wantedLang languages.Language
-
-	if lang == string(languages.JAVA) {
-		wantedLang = languages.JAVA
-	} else if lang == string(languages.TS) {
-		wantedLang = languages.TS
-	} else {
-		languageErr = errors.NewLanguageNotSupportedError(lang)
-	}
-
-	if languageErr != nil {
-		return languageErr
-	}
-
-	files, err := pgk.CreepDir(rootDir)
-
-	if err != nil {
-		return err
+	if files == nil {
+		return errors.NewEmptySequenceError("files sequence")
 	}
 
 	fileAnalyser, e := languages.GetAnalyser(wantedLang)
@@ -55,7 +38,7 @@ func (agg *ProjectGraphAggregator) Aggregate(rootDir string, lang string) error 
 
 	fileNameToFileScan := make(map[string]*pgk.FileScan, 0)
 
-	for file := range files {
+	for _, file := range files {
 		fileNameToFileScan[file.Name] = file
 	}
 

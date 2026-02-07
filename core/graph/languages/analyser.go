@@ -2,7 +2,7 @@ package languages
 
 import (
 	"fmt"
-	"raidline/ripple/core/model"
+	"raidline/ripple/core/graph/model"
 	"raidline/ripple/errors"
 	"strings"
 

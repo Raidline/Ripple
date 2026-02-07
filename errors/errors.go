@@ -25,3 +25,7 @@ func NewLanguageNotSupportedError(lang string) *LanguageNotFoundError {
 		Supported: make([]string, 0),
 	}
 }
+
+func NewEmptySequenceError(sequence string) error {
+	return fmt.Errorf("[%s] Slice/Sequence cannot be nil or empty", sequence)
+}

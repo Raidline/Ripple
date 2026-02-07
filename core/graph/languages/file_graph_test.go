@@ -7,7 +7,7 @@ import (
 
 func TestBuildFileGraph(t *testing.T) {
 
-	files, err := pgk.CreepDir("../../resources/test-files")
+	creepRes, err := pgk.CreepDir("../../../resources/test-files")
 
 	if err != nil {
 		t.Errorf("Should be able to read the test resources, %s", err.Error())
@@ -16,7 +16,7 @@ func TestBuildFileGraph(t *testing.T) {
 
 	var foundFile *pgk.FileScan
 
-	for f := range files {
+	for _, f := range creepRes.Files {
 		if f.Name == "InspectionZoneService" {
 			foundFile = f
 		}
