@@ -1,6 +1,7 @@
-package watcher
+package events
 
 import (
+	"context"
 	"raidline/ripple/core/graph"
 	"raidline/ripple/errors"
 )
@@ -78,12 +79,12 @@ import (
 //
 
 type FileWatcher struct {
-	projectGraph *graph.ProjectGraphAggregator
+	graph *graph.ProjectGraphAggregator //do we need this here?
 }
 
 func NewWatcher(pg *graph.ProjectGraphAggregator) (*FileWatcher, error) {
 	return &FileWatcher{
-		projectGraph: pg,
+		graph: pg,
 	}, nil
 }
 
@@ -97,11 +98,11 @@ func NewWatcher(pg *graph.ProjectGraphAggregator) (*FileWatcher, error) {
 // Listens to file changes and and calls the project graph to get the ripple effects
 //
 // Returns a channel that is triggered when a change happens to a certain file, or error
-func (f *FileWatcher) Watch(dirs []string) error { //todo: return read-only channel
+func (f *FileWatcher) Watch(ctx context.Context, dirs []string) (<-chan string, error) {
 
 	if len(dirs) == 0 {
-		return errors.NewEmptySequenceError("directory paths")
+		return nil, errors.NewEmptySequenceError("directory paths")
 	}
 
-	return nil
+	return nil, nil
 }

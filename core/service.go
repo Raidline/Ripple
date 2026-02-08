@@ -1,34 +1,43 @@
 package core
 
 import (
+	"context"
+	"os"
+	"os/signal"
+	"raidline/ripple/core/events"
 	"raidline/ripple/core/graph"
 	"raidline/ripple/core/graph/languages"
-	"raidline/ripple/core/watcher"
 	"raidline/ripple/errors"
 	"raidline/ripple/pgk"
 )
 
 type Service struct {
 	projectGraph *graph.ProjectGraphAggregator
-	watcher      *watcher.FileWatcher
+	watcher      *events.FileWatcher
+	listener     *events.FileEventListener
 }
 
 func NewService() (*Service, error) { // should receive params from input , tbd
 	graphAggregator := graph.Create()
-	fileWatcher, err := watcher.NewWatcher(graphAggregator)
+	fileWatcher, err := events.NewWatcher(graphAggregator)
+	listener, lErr := events.NewFileListener(graphAggregator)
 
 	if err != nil {
 		return nil, err
 	}
 
+	if lErr != nil {
+		return nil, lErr
+	}
+
 	return &Service{
 		projectGraph: graphAggregator,
 		watcher:      fileWatcher,
+		listener:     listener,
 	}, nil
 }
 
 func (s *Service) Orchestrate(root string, lang string) error {
-
 	creepRes, err := pgk.CreepDir(root)
 
 	if err != nil {
@@ -56,14 +65,18 @@ func (s *Service) Orchestrate(root string, lang string) error {
 		return gErr
 	}
 
-	wErr := s.watcher.Watch(creepRes.Dirs)
+	//probably need a wait group in main to wait for all the goroutines to finish
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop() // Clean up resources when main exits
+
+	eventChan, wErr := s.watcher.Watch(ctx, creepRes.Dirs) //todo
 
 	if wErr != nil {
 		return wErr
 	}
 
-	//todo: make first the query to the graph to make sure we can get what we want
-	//todo: only then do the watcher
+	s.listener.Listen(ctx, eventChan) //todo
 
 	return nil
 }
