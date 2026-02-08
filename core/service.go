@@ -62,5 +62,8 @@ func (s *Service) Orchestrate(root string, lang string) error {
 		return wErr
 	}
 
+	//todo: make first the query to the graph to make sure we can get what we want
+	//todo: only then do the watcher
+
 	return nil
 }

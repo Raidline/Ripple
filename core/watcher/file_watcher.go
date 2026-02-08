@@ -8,11 +8,6 @@ import (
 // (kqueue on macOS, inotify on Linux, ReadDirectoryChangesW on Windows).
 // Use a library like fsnotify.
 // fsnotify does not support recursive, need to implement mannualy.
-// It seems we can add the path we are going through to the main watcher. This creates a circular dependency between the project builder and the FileWatcher as things are
-// DirCrepeer will be present a level above and project.Aggregate will receive the sequence of files already, instead of building them there
-// CreepDir will need to return a more well-defined struct with the *FileScan and all the dirs as a []string to be added to the watchers
-// !Should not receive the watcher because we need to defer the close of watcher after creation, and this file should be the one responsible for it!
-// This struct will then receive the path[] to create the watchers and the graph
 //
 // Code example for the watcher:
 //watcher, err := fsnotify.NewWatcher()
@@ -100,7 +95,9 @@ func NewWatcher(pg *graph.ProjectGraphAggregator) (*FileWatcher, error) {
 //
 // Creates the watcher based on the paths found of the project
 // Listens to file changes and and calls the project graph to get the ripple effects
-func (f *FileWatcher) Watch(dirs []string) error {
+//
+// Returns a channel that is triggered when a change happens to a certain file, or error
+func (f *FileWatcher) Watch(dirs []string) error { //todo: return read-only channel
 
 	if len(dirs) == 0 {
 		return errors.NewEmptySequenceError("directory paths")

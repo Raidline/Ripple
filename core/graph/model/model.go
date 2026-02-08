@@ -3,9 +3,9 @@ package model
 // --- Graph Structures ---
 
 type GraphEdge struct {
-	To     *ClassGraph // where it is connected to
-	From   *ClassGraph // where it came from
-	Weight int         // this is not used at the moment - but will be used to know how much depedency there is between both
+	To     *GraphVertice // where it is connected to
+	From   *GraphVertice // where it came from
+	Weight int           // this is not used at the moment - but will be used to know how much depedency there is between both
 }
 
 type GraphVertice struct {

@@ -69,7 +69,7 @@ func (agg *ProjectGraphAggregator) createGraphForFile(fileScan *pgk.FileScan,
 	seen map[string]bool,
 	fileNameToFileScan map[string]*pgk.FileScan,
 	fileAnalyser languages.LanguageAnalyser,
-	wantedLang languages.Language) (*model.ClassGraph, error) {
+	wantedLang languages.Language) (*model.GraphVertice, error) {
 
 	if seen[fileScan.Name] {
 		return nil, nil
@@ -87,9 +87,13 @@ func (agg *ProjectGraphAggregator) createGraphForFile(fileScan *pgk.FileScan,
 
 	if vertice, ok := agg.Graph.Vertices[fileGraph.ClassName]; ok {
 		// this might already exist but as a from dependency, now we need to add the to's
-		agg.connectEdgesToVertice(vertice, fileNameToFileScan, fileGraph, func(fileScan *pgk.FileScan) (*model.ClassGraph, error) {
+		agg.connectEdgesToVertice(vertice, fileNameToFileScan, fileGraph, func(fileScan *pgk.FileScan) (*model.GraphVertice, error) {
 			return agg.createGraphForFile(fileScan, seen, fileNameToFileScan, fileAnalyser, wantedLang)
 		})
+
+		seen[fileScan.Name] = true
+
+		return vertice, nil
 	} else {
 		v := &model.GraphVertice{
 			Node:  fileGraph,
@@ -99,18 +103,19 @@ func (agg *ProjectGraphAggregator) createGraphForFile(fileScan *pgk.FileScan,
 		agg.Graph.Vertices[fileGraph.ClassName] = v
 
 		//Edges will be added by memory reference (i hope?)
-		agg.connectEdgesToVertice(v, fileNameToFileScan, fileGraph, func(fileScan *pgk.FileScan) (*model.ClassGraph, error) {
+		agg.connectEdgesToVertice(v, fileNameToFileScan, fileGraph, func(fileScan *pgk.FileScan) (*model.GraphVertice, error) {
 			return agg.createGraphForFile(fileScan, seen, fileNameToFileScan, fileAnalyser, wantedLang)
 		})
+
+		seen[fileScan.Name] = true
+
+		return v, nil
 	}
-
-	seen[fileScan.Name] = true
-
-	return fileGraph, nil
 }
 
-func (agg *ProjectGraphAggregator) connectEdgesToVertice(vert *model.GraphVertice, fileNameToFileScan map[string]*pgk.FileScan,
-	fileGraph *model.ClassGraph, cb func(fileScan *pgk.FileScan) (*model.ClassGraph, error)) error {
+func (agg *ProjectGraphAggregator) connectEdgesToVertice(vert *model.GraphVertice,
+	fileNameToFileScan map[string]*pgk.FileScan,
+	fileGraph *model.ClassGraph, cb func(fileScan *pgk.FileScan) (*model.GraphVertice, error)) error {
 
 	fieldToDependency := make(map[string]*pgk.FileScan, 0)
 
@@ -124,21 +129,21 @@ func (agg *ProjectGraphAggregator) connectEdgesToVertice(vert *model.GraphVertic
 
 		if vertice, ok := agg.Graph.Vertices[name]; ok {
 			vert.Edges = append(vert.Edges, model.GraphEdge{
-				To:     vertice.Node,
-				From:   fileGraph,
+				To:     vertice,
+				From:   vert,
 				Weight: 0, // should be the count of times this import is used
 			})
 		} else {
 			//build the file
-			classG, e := cb(scan)
+			newVertice, e := cb(scan)
 
 			if e != nil {
 				return e
 			}
 
 			vert.Edges = append(vert.Edges, model.GraphEdge{
-				To:     classG,
-				From:   fileGraph,
+				To:     newVertice,
+				From:   vert,
 				Weight: 0, // should be the count of times this import is used
 			})
 		}
