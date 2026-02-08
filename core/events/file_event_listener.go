@@ -45,8 +45,8 @@ func (fl *FileEventListener) Listen(ctx context.Context, fileChanged <-chan stri
 				}
 			} else {
 				// this can be a case where the file was added. In this case we just update the projectGraph
-				// todo: send update to the graph here, for now panic
-				panic(fmt.Errorf("The file we received update from is not in the graph"))
+				// todo: send update to the graph here
+				fmt.Printf("The file we received update from is not in the graph. \n")
 			}
 		}
 	}

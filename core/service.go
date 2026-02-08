@@ -2,17 +2,16 @@ package core
 
 import (
 	"context"
-	"os"
-	"os/signal"
 	"raidline/ripple/core/events"
 	"raidline/ripple/core/graph"
 	"raidline/ripple/core/graph/languages"
 	"raidline/ripple/errors"
 	"raidline/ripple/pgk"
+	"sync"
 )
 
 type Service struct {
-	projectGraph *graph.ProjectGraphAggregator
+	ProjectGraph *graph.ProjectGraphAggregator
 	watcher      *events.FileWatcher
 	listener     *events.FileEventListener
 }
@@ -31,17 +30,17 @@ func NewService() (*Service, error) { // should receive params from input , tbd
 	}
 
 	return &Service{
-		projectGraph: graphAggregator,
+		ProjectGraph: graphAggregator,
 		watcher:      fileWatcher,
 		listener:     listener,
 	}, nil
 }
 
-func (s *Service) Orchestrate(root string, lang string) error {
+func (s *Service) Orchestrate(ctx context.Context, root string, lang string) (*sync.WaitGroup, error) {
 	creepRes, err := pgk.CreepDir(root)
 
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	var languageErr error
@@ -56,27 +55,27 @@ func (s *Service) Orchestrate(root string, lang string) error {
 	}
 
 	if languageErr != nil {
-		return languageErr
+		return nil, languageErr
 	}
-	// in a optimal world we would get the lang by creeping the project.tbd
-	gErr := s.projectGraph.Aggregate(creepRes.Files, wantedLang)
+
+	//todo: in a optimal world we would get the lang by creeping the project.
+	gErr := s.ProjectGraph.Aggregate(creepRes.Files, wantedLang)
 
 	if gErr != nil {
-		return gErr
+		return nil, gErr
 	}
 
-	//probably need a wait group in main to wait for all the goroutines to finish
+	wg := &sync.WaitGroup{}
 
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
-	defer stop() // Clean up resources when main exits
-
-	eventChan, wErr := s.watcher.Watch(ctx, creepRes.Dirs) //todo
+	eventChan, wErr := s.watcher.Watch(ctx, creepRes.Dirs)
 
 	if wErr != nil {
-		return wErr
+		return nil, wErr
 	}
 
-	s.listener.Listen(ctx, eventChan) //todo
+	wg.Go(func() {
+		s.listener.Listen(ctx, eventChan)
+	})
 
-	return nil
+	return wg, nil
 }
