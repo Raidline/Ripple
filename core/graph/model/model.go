@@ -14,7 +14,7 @@ type GraphVertice struct {
 }
 
 type ProjectGraph struct {
-	Vertices map[string]*GraphVertice
+	Vertices map[string]*GraphVertice // string represent the file name as "File" without the extensions (.java/.go, etc...)
 }
 
 type ClassGraph struct {

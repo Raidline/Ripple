@@ -102,7 +102,7 @@ func (agg *ProjectGraphAggregator) createGraphForFile(fileScan *pgk.FileScan,
 		// todo(the fields and method info to get the weight of each import)
 		agg.Graph.Vertices[fileGraph.ClassName] = v
 
-		//Edges will be added by memory reference (i hope?)
+		//Edges will be added by memory reference
 		agg.connectEdgesToVertice(v, fileNameToFileScan, fileGraph, func(fileScan *pgk.FileScan) (*model.GraphVertice, error) {
 			return agg.createGraphForFile(fileScan, seen, fileNameToFileScan, fileAnalyser, wantedLang)
 		})
