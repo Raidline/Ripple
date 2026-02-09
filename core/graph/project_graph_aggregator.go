@@ -7,11 +7,6 @@ import (
 	"raidline/ripple/pgk"
 )
 
-var packageBreakerSimbols = map[languages.Language]string{
-	languages.JAVA: ".",
-	languages.TS:   "/",
-}
-
 type ProjectGraphAggregator struct {
 	Graph *model.ProjectGraph
 }
@@ -135,7 +130,8 @@ func (agg *ProjectGraphAggregator) connectEdgesToVertice(vert *model.GraphVertic
 			})
 		} else {
 			//build the file
-			newVertice, e := cb(scan)
+			newVertice, e := cb(scan) //todo: if we see this causes to much memory or time, we can skip this node here and implement the logic where we see if this node is already connected to any another node and make that connection
+			// on a large project probably this make more sense, because you will end up with the Stacj going crazy
 
 			if e != nil {
 				return e

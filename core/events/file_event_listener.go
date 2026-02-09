@@ -46,6 +46,9 @@ func (fl *FileEventListener) Listen(ctx context.Context, fileChanged <-chan stri
 			} else {
 				// this can be a case where the file was added. In this case we just update the projectGraph
 				// todo: send update to the graph here
+				// When the Watcher updates a file, it should create a totally new GraphVertice object and replace the old one in the map.
+				//The TUI will keep holding the "old" version it was reading (which is safe, because that old slice isn't being modified anymore).
+				//The Map will now point to the "new" version.
 				fmt.Printf("The file we received update from is not in the graph. \n")
 			}
 		}

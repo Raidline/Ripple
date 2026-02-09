@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"os"
+	"os/exec"
 	"raidline/ripple/core/graph"
 	"raidline/ripple/errors"
 	"strings"
@@ -56,7 +57,7 @@ func (f *FileWatcher) Watch(ctx context.Context, dirs []string) (<-chan string, 
 		for {
 			select {
 			case <-ctx.Done():
-				return // Exit on context cancellation
+				return
 
 			case event, ok := <-f.fsWatcher.Events:
 				if !ok {
@@ -67,7 +68,6 @@ func (f *FileWatcher) Watch(ctx context.Context, dirs []string) (<-chan string, 
 					continue
 				}
 
-				// Handle New Directories (Recursive Watch)
 				if event.Op&fsnotify.Create == fsnotify.Create {
 					info, err := os.Stat(event.Name)
 					if err == nil && info.IsDir() {
@@ -80,7 +80,14 @@ func (f *FileWatcher) Watch(ctx context.Context, dirs []string) (<-chan string, 
 					continue
 				}
 
-				if hasFileNotChanged(event.Name) {
+				changed, fileErr := hasFileNotChanged(ctx, event.Name)
+
+				if fileErr != nil {
+					log.Println("Error on git verify:", err)
+					return
+				}
+
+				if changed {
 					continue
 				}
 
@@ -95,6 +102,7 @@ func (f *FileWatcher) Watch(ctx context.Context, dirs []string) (<-chan string, 
 					return
 				}
 				log.Println("Watcher error:", err)
+				return
 			}
 		}
 	}()
@@ -103,7 +111,20 @@ func (f *FileWatcher) Watch(ctx context.Context, dirs []string) (<-chan string, 
 	return outCh, nil
 }
 
-func hasFileNotChanged(file string) bool {
-	// Run git diff-index --quiet HEAD file.extensions to make sure the change wasn't just a "touch" (where timestamp changed but content didn't).
-	return true
+// Verify if change wasn't just a "touch" (where timestamp changed but content didn't).
+func hasFileNotChanged(ctx context.Context, file string) (bool, error) {
+	cmd := exec.CommandContext(ctx, "git", "diff-index", "--quiet", "HEAD", "--", file) // see if we need to path
+
+	err := cmd.Run()
+	if err == nil {
+		return false, nil
+	}
+
+	if exitError, ok := err.(*exec.ExitError); ok {
+		if exitError.ExitCode() == 1 {
+			return true, nil
+		}
+	}
+
+	return false, err
 }
