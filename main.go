@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"raidline/ripple/chat"
 	"raidline/ripple/core"
 	"raidline/ripple/core/graph"
 )
@@ -49,9 +50,12 @@ func main() {
 		panic(err)
 	}
 
-	//todo: here we can launch some kind of TUI, or interactive "chat" where user can ask questions about the project
 	go func() {
-		runTUI(s.ProjectGraph)
+		e := runTUI(s.ProjectGraph)
+
+		if e != nil {
+			cancel()
+		}
 
 		cancel()
 	}()
@@ -63,9 +67,11 @@ func main() {
 	fmt.Println("Bye!")
 }
 
-func runTUI(pg *graph.ProjectGraphAggregator) {
-	// we need to be aware that in the case that we write in the graph (new file for example)
-	// if we try to access the graph node in here while it is being written we will have a race condition
-	// when do this also create a mutex in the model ClassGraph to safe-guard that
-	fmt.Println("I AM A TUIIIII")
+func runTUI(pg *graph.ProjectGraphAggregator) error {
+	querier := chat.NewQuerier(pg)
+	t := chat.NewTui(querier)
+
+	e := t.Init()
+
+	return e
 }
