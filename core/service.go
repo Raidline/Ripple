@@ -2,11 +2,12 @@ package core
 
 import (
 	"context"
+	"log"
 	"raidline/ripple/core/events"
 	"raidline/ripple/core/graph"
+	"raidline/ripple/core/graph/creeper"
 	"raidline/ripple/core/graph/languages"
 	"raidline/ripple/errors"
-	"raidline/ripple/pgk"
 	"sync"
 )
 
@@ -37,7 +38,8 @@ func NewService() (*Service, error) { // should receive params from input , tbd
 }
 
 func (s *Service) Orchestrate(ctx context.Context, root string, lang string) (*sync.WaitGroup, error) {
-	creepRes, err := pgk.CreepDir(root)
+	log.Printf("creeping project in dir : [%s] for lang : [%s]", root, lang)
+	creepRes, err := creeper.CreepDir(root)
 
 	if err != nil {
 		return nil, err

@@ -1,5 +1,13 @@
 package model
 
+import "iter"
+
+type FileScan struct {
+	Dir   string
+	Name  string
+	Lines iter.Seq[string]
+}
+
 // --- Graph Structures ---
 
 type GraphEdge struct {

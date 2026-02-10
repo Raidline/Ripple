@@ -1,14 +1,14 @@
-package languages
+package file
 
 import (
 	"context"
+	"raidline/ripple/core/graph/languages"
 	"raidline/ripple/core/graph/model"
-	"raidline/ripple/pgk"
 
 	sitter "github.com/smacker/go-tree-sitter"
 )
 
-func BuildFileGraph(file *pgk.FileScan, analyser LanguageAnalyser) (*model.ClassGraph, error) {
+func BuildFileGraph(file *model.FileScan, analyser languages.LanguageAnalyser) (*model.ClassGraph, error) {
 	source := convertFileScan(file)
 
 	parser := sitter.NewParser()
@@ -91,7 +91,7 @@ func BuildFileGraph(file *pgk.FileScan, analyser LanguageAnalyser) (*model.Class
 	return graph, nil
 }
 
-func convertFileScan(file *pgk.FileScan) []byte {
+func convertFileScan(file *model.FileScan) []byte {
 	var source []byte
 
 	for line := range file.Lines {

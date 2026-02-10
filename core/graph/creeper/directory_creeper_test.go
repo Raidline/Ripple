@@ -1,4 +1,4 @@
-package pgk
+package creeper
 
 import (
 	"testing"

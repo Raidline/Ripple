@@ -1,10 +1,10 @@
 package graph
 
 import (
+	"raidline/ripple/core/graph/file"
 	"raidline/ripple/core/graph/languages"
 	"raidline/ripple/core/graph/model"
 	"raidline/ripple/errors"
-	"raidline/ripple/pgk"
 )
 
 type ProjectGraphAggregator struct {
@@ -19,7 +19,7 @@ func Create() *ProjectGraphAggregator {
 	}
 }
 
-func (agg *ProjectGraphAggregator) Aggregate(files []*pgk.FileScan, wantedLang languages.Language) error {
+func (agg *ProjectGraphAggregator) Aggregate(files []*model.FileScan, wantedLang languages.Language) error {
 
 	if files == nil {
 		return errors.NewEmptySequenceError("files sequence")
@@ -31,7 +31,7 @@ func (agg *ProjectGraphAggregator) Aggregate(files []*pgk.FileScan, wantedLang l
 		return e
 	}
 
-	fileNameToFileScan := make(map[string]*pgk.FileScan, 0)
+	fileNameToFileScan := make(map[string]*model.FileScan, 0)
 
 	for _, file := range files {
 		fileNameToFileScan[file.Name] = file
@@ -43,7 +43,7 @@ func (agg *ProjectGraphAggregator) Aggregate(files []*pgk.FileScan, wantedLang l
 }
 
 func (agg *ProjectGraphAggregator) createProjectGraph(
-	fileNameToFileScan map[string]*pgk.FileScan,
+	fileNameToFileScan map[string]*model.FileScan,
 	fileAnalyser languages.LanguageAnalyser,
 	wantedLang languages.Language) error {
 
@@ -60,9 +60,9 @@ func (agg *ProjectGraphAggregator) createProjectGraph(
 	return nil
 }
 
-func (agg *ProjectGraphAggregator) createGraphForFile(fileScan *pgk.FileScan,
+func (agg *ProjectGraphAggregator) createGraphForFile(fileScan *model.FileScan,
 	seen map[string]bool,
-	fileNameToFileScan map[string]*pgk.FileScan,
+	fileNameToFileScan map[string]*model.FileScan,
 	fileAnalyser languages.LanguageAnalyser,
 	wantedLang languages.Language) (*model.GraphVertice, error) {
 
@@ -74,7 +74,7 @@ func (agg *ProjectGraphAggregator) createGraphForFile(fileScan *pgk.FileScan,
 		panic("Scan of the file cannot be empty")
 	}
 
-	fileGraph, fileGErr := languages.BuildFileGraph(fileScan, fileAnalyser)
+	fileGraph, fileGErr := file.BuildFileGraph(fileScan, fileAnalyser)
 
 	if fileGErr != nil {
 		return nil, fileGErr
@@ -82,7 +82,7 @@ func (agg *ProjectGraphAggregator) createGraphForFile(fileScan *pgk.FileScan,
 
 	if vertice, ok := agg.Graph.Vertices[fileGraph.ClassName]; ok {
 		// this might already exist but as a from dependency, now we need to add the to's
-		agg.connectEdgesToVertice(vertice, fileNameToFileScan, fileGraph, func(fileScan *pgk.FileScan) (*model.GraphVertice, error) {
+		agg.connectEdgesToVertice(vertice, fileNameToFileScan, fileGraph, func(fileScan *model.FileScan) (*model.GraphVertice, error) {
 			return agg.createGraphForFile(fileScan, seen, fileNameToFileScan, fileAnalyser, wantedLang)
 		})
 
@@ -98,7 +98,7 @@ func (agg *ProjectGraphAggregator) createGraphForFile(fileScan *pgk.FileScan,
 		agg.Graph.Vertices[fileGraph.ClassName] = v
 
 		//Edges will be added by memory reference
-		agg.connectEdgesToVertice(v, fileNameToFileScan, fileGraph, func(fileScan *pgk.FileScan) (*model.GraphVertice, error) {
+		agg.connectEdgesToVertice(v, fileNameToFileScan, fileGraph, func(fileScan *model.FileScan) (*model.GraphVertice, error) {
 			return agg.createGraphForFile(fileScan, seen, fileNameToFileScan, fileAnalyser, wantedLang)
 		})
 
@@ -109,10 +109,10 @@ func (agg *ProjectGraphAggregator) createGraphForFile(fileScan *pgk.FileScan,
 }
 
 func (agg *ProjectGraphAggregator) connectEdgesToVertice(vert *model.GraphVertice,
-	fileNameToFileScan map[string]*pgk.FileScan,
-	fileGraph *model.ClassGraph, cb func(fileScan *pgk.FileScan) (*model.GraphVertice, error)) error {
+	fileNameToFileScan map[string]*model.FileScan,
+	fileGraph *model.ClassGraph, cb func(fileScan *model.FileScan) (*model.GraphVertice, error)) error {
 
-	fieldToDependency := make(map[string]*pgk.FileScan, 0)
+	fieldToDependency := make(map[string]*model.FileScan, 0)
 
 	for _, f := range fileGraph.Fields {
 		if v, ok := fileNameToFileScan[f.Type]; ok {

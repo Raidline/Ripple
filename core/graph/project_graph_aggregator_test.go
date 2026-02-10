@@ -1,8 +1,8 @@
 package graph
 
 import (
+	"raidline/ripple/core/graph/creeper"
 	"raidline/ripple/core/graph/languages"
-	"raidline/ripple/pgk"
 	"testing"
 )
 
@@ -10,7 +10,7 @@ func TestAggregate(t *testing.T) {
 
 	agg := Create()
 
-	creepResult, _ := pgk.CreepDir("../../resources/test-files")
+	creepResult, _ := creeper.CreepDir("../../resources/test-files")
 
 	e := agg.Aggregate(creepResult.Files, languages.JAVA)
 
