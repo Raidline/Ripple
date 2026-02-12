@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- CONFIGURATION ---
-BINARY_NAME="creep-analyzer"
+BINARY_NAME="ripple"
 MAIN_FILE="main.go"
 
 # --- COLORS FOR OUTPUT ---

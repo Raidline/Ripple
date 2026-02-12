@@ -2,8 +2,8 @@ package events
 
 import (
 	"context"
-	"fmt"
 	"raidline/ripple/core/graph"
+	"raidline/ripple/pgk/logger"
 	"strings"
 )
 
@@ -20,28 +20,28 @@ func NewFileListener(pg *graph.ProjectGraphAggregator) (*FileEventListener, erro
 //events will maybe be another type, because we need the file name to go to the graph
 
 func (fl *FileEventListener) Listen(ctx context.Context, fileChanged <-chan string) { // for now we assume this is the file name
-	fmt.Println("Ready and listening...")
+	logger.Info("Ready and listening...")
 
 	for {
 		select {
 		case <-ctx.Done():
-			fmt.Println("Context cancelled, cleaning up...")
+			logger.Info("Context cancelled, cleaning up...")
 			return
 		case file, ok := <-fileChanged:
 			if !ok {
-				fmt.Println("Consumer: Event channel closed, exiting...")
+				logger.Info("Consumer: Event channel closed, exiting...")
 				return
 			}
 
-			fmt.Printf("Got event : [%s]...\n", file) // this is the filename (with extension)
+			logger.Info("Got event : [%s]...\n", file) // this is the filename (with extension)
 			filename := extractFilename(file)
 
 			if fileVertice, ok := fl.projectGraph.Graph.Vertices[filename]; ok {
-				fmt.Printf("File : [%s] impacts: \n", filename)
+				logger.Info("File : [%s] impacts: \n", filename)
 				// verify if here we want to do a BFS or DFS to know the real impact of the file.
 				// This is just the direct impacts, which is fine, but we can (if requested) make a more deep find
 				for _, edge := range fileVertice.Edges {
-					fmt.Printf("[%s] \n", edge.To.Node.ClassName)
+					logger.Info("[%s] \n", edge.To.Node.ClassName)
 				}
 			} else {
 				// this can be a case where the file was added. In this case we just update the projectGraph
@@ -49,7 +49,7 @@ func (fl *FileEventListener) Listen(ctx context.Context, fileChanged <-chan stri
 				// When the Watcher updates a file, it should create a totally new GraphVertice object and replace the old one in the map.
 				//The TUI will keep holding the "old" version it was reading (which is safe, because that old slice isn't being modified anymore).
 				//The Map will now point to the "new" version.
-				fmt.Printf("The file we received update from is not in the graph. \n")
+				logger.Info("The file we received update from is not in the graph. \n")
 			}
 		}
 	}

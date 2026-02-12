@@ -1,10 +1,13 @@
 package graph
 
 import (
+	"fmt"
 	"raidline/ripple/core/graph/file"
 	"raidline/ripple/core/graph/languages"
 	"raidline/ripple/core/graph/model"
 	"raidline/ripple/errors"
+	"raidline/ripple/pgk/logger"
+	"strings"
 )
 
 type ProjectGraphAggregator struct {
@@ -38,6 +41,10 @@ func (agg *ProjectGraphAggregator) Aggregate(files []*model.FileScan, wantedLang
 	}
 
 	agg.createProjectGraph(fileNameToFileScan, fileAnalyser, wantedLang)
+
+	go func() {
+		debugProjectGraph(agg.Graph)
+	}()
 
 	return nil
 }
@@ -146,4 +153,50 @@ func (agg *ProjectGraphAggregator) connectEdgesToVertice(vert *model.GraphVertic
 	}
 
 	return nil
+}
+
+func debugProjectGraph(graph *model.ProjectGraph) {
+	var sb strings.Builder
+
+	sb.WriteString("\n--- Project Graph Snapshot ---\n")
+
+	if graph == nil || len(graph.Vertices) == 0 {
+		sb.WriteString("Graph is empty.\n")
+		logger.Debug(sb.String())
+		return
+	}
+
+	nameMap := make(map[*model.GraphVertice]string)
+	for name, v := range graph.Vertices {
+		nameMap[v] = name
+	}
+
+	sb.WriteString(fmt.Sprintf("Total Vertices: %d\n", len(graph.Vertices)))
+
+	for filename, vertex := range graph.Vertices {
+		sb.WriteString(fmt.Sprintf("%s\n", filename))
+
+		if len(vertex.Edges) == 0 {
+			sb.WriteString("  └── (no dependencies)\n")
+			continue
+		}
+
+		for i, edge := range vertex.Edges {
+			connector := "  ├──"
+			if i == len(vertex.Edges)-1 {
+				connector = "  └──"
+			}
+
+			targetName := nameMap[edge.To]
+			if targetName == "" {
+				targetName = "External/Unknown"
+			}
+
+			sb.WriteString(fmt.Sprintf("%s %s (w:%d)\n", connector, targetName, edge.Weight))
+		}
+	}
+
+	sb.WriteString("--- End of Snapshot ---\n")
+
+	logger.Debug(sb.String())
 }

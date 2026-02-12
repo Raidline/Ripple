@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"raidline/ripple/core/graph/model"
+	"raidline/ripple/pgk/logger"
 	"strings"
 )
 
@@ -45,6 +46,8 @@ func CreepDir(dir string) (*CreepScanResult, error) {
 
 		return nil
 	})
+
+	logger.Debug("Creeper has ended with [%d] dirs and [%d] files", len(dirs), len(files))
 
 	return &CreepScanResult{
 		Dirs:  dirs,

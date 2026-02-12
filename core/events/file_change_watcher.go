@@ -2,11 +2,11 @@ package events
 
 import (
 	"context"
-	"log"
 	"os"
 	"os/exec"
 	"raidline/ripple/core/graph"
 	"raidline/ripple/errors"
+	"raidline/ripple/pgk/logger"
 	"strings"
 
 	"github.com/fsnotify/fsnotify"
@@ -83,7 +83,7 @@ func (f *FileWatcher) Watch(ctx context.Context, dirs []string) (<-chan string, 
 				changed, fileErr := hasFileNotChanged(ctx, event.Name)
 
 				if fileErr != nil {
-					log.Println("Error on git verify:", err)
+					logger.Error("Error on git verify: [%s]", err.Error())
 					return
 				}
 
@@ -101,7 +101,7 @@ func (f *FileWatcher) Watch(ctx context.Context, dirs []string) (<-chan string, 
 				if !ok {
 					return
 				}
-				log.Println("Watcher error:", err)
+				logger.Error("Watcher error: [%s]", err.Error())
 				return
 			}
 		}

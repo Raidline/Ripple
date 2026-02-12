@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"raidline/ripple/core/graph/model"
 	"raidline/ripple/errors"
+	"raidline/ripple/pgk/assertions"
 	"strings"
 
 	sitter "github.com/smacker/go-tree-sitter"
@@ -76,25 +77,11 @@ func newJavaAnalyzer() *JavaAnalyzer {
 	pQ, pErr := sitter.NewQuery([]byte(`(formal_parameter type: (_) @t name: (identifier) @n)`), l)
 	cQ, cErr := sitter.NewQuery([]byte(`(method_invocation object: (_)? @tgt name: (identifier) @meth)`), l)
 
-	if sErr != nil {
-		panic(fmt.Errorf("Structure query could not be formed : [%s]", sErr.Error()))
-	}
-
-	if fErr != nil {
-		panic(fmt.Errorf("Field query could not be formed : [%s]", fErr.Error()))
-	}
-
-	if mErr != nil {
-		panic(fmt.Errorf("Method query could not be formed : [%s]", mErr.Error()))
-	}
-
-	if pErr != nil {
-		panic(fmt.Errorf("Sub Method query Param Query could not be formed : [%s]", pErr.Error()))
-	}
-
-	if cErr != nil {
-		panic(fmt.Errorf("Sub Method query Call Query could not be formed : [%s]", cErr.Error()))
-	}
+	assertions.NonError(sErr, "Structure query could not be formed")
+	assertions.NonError(fErr, "Field query could not be formed")
+	assertions.NonError(mErr, "Method query could not be formed")
+	assertions.NonError(pErr, "Sub Method query Param Query could not be formed")
+	assertions.NonError(cErr, "Sub Method query Call Query could not be formed")
 
 	return &JavaAnalyzer{
 		lang:        l,

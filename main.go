@@ -9,6 +9,8 @@ import (
 	"raidline/ripple/chat"
 	"raidline/ripple/core"
 	"raidline/ripple/core/graph"
+	"raidline/ripple/pgk/assertions"
+	"raidline/ripple/pgk/logger"
 )
 
 func main() {
@@ -18,37 +20,26 @@ func main() {
 	flag.Parse()
 
 	absPath, err := filepath.Abs(*rootPath)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error resolving path: %v\n", err)
-		os.Exit(1)
-	}
+	assertions.NonError(err, fmt.Sprintf("Error resolving path: %v\n", err))
 
 	info, err := os.Stat(absPath)
-	if os.IsNotExist(err) {
-		fmt.Fprintf(os.Stderr, "Error: Path [%s] does not exist.\n", absPath)
-		os.Exit(1)
-	}
-	if !info.IsDir() {
-		fmt.Fprintf(os.Stderr, "Error: Path [%s] is a file, but a directory is required.\n", absPath)
-		os.Exit(1)
-	}
+	assertions.Condition(!os.IsNotExist(err), fmt.Sprintf("Error: Path [%s] does not exist.\n", absPath))
+	assertions.Condition(info.IsDir(), fmt.Sprintf("Error: Path [%s] is a file, but a directory is required.\n", absPath))
 
-	fmt.Printf("Starting Analyzer on: %s\n", absPath)
+	logger.Init(true)
+
+	logger.Info("Starting Analyzer on: %s", absPath)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	s, e := core.NewService()
 
-	if e != nil {
-		panic(e)
-	}
+	assertions.NonError(e, "Could not start service")
 
 	serviceWg, err := s.Orchestrate(ctx, absPath, *lang)
 
-	if err != nil {
-		panic(err)
-	}
+	assertions.NonError(err, "Service gave an error while Orchestrating")
 
 	go func() {
 		e := runTUI(s.ProjectGraph)
@@ -62,9 +53,9 @@ func main() {
 
 	<-ctx.Done()
 
-	fmt.Println("Shutting down background services...")
+	logger.Info("Shutting down background services...")
 	serviceWg.Wait()
-	fmt.Println("Bye!")
+	logger.Info("Bye!")
 }
 
 func runTUI(pg *graph.ProjectGraphAggregator) error {
