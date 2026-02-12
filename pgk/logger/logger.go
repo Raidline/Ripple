@@ -40,7 +40,7 @@ func new() *Logger {
 	defer f.Close()
 
 	f.WriteString("\n")
-	fmt.Fprintf(f, addTimestamp("--- New Logging Entries --- \n"))
+	f.WriteString(addTimestamp("--- New Logging Entries --- \n"))
 
 	return &Logger{
 		debugEnabled: false,
