@@ -25,26 +25,33 @@ type responseMsg string
 
 // 3. THE MODEL (State)
 type model struct {
-	viewport  viewport.Model
-	textInput textinput.Model
-	spinner   spinner.Model
-	history   []string
-	err       error
-	isReady   bool
-	isLoading bool
-	querier   *GraphQuerier
+	chatViewport viewport.Model
+	watchMode    bool
+	sideViewport viewport.Model // For the file change logs
+	textInput    textinput.Model
+	spinner      spinner.Model
+	history      []string
+	err          error
+	isReady      bool
+	isLoading    bool
+	querier      *GraphQuerier
+
+	width  int
+	height int
 }
 
 type Tui struct {
 	program *tea.Program
+	watch   bool
 	querier *GraphQuerier
 }
 
-func NewTui(q *GraphQuerier) *Tui {
-	p := tea.NewProgram(initialModel(q), tea.WithAltScreen())
+func NewTui(q *GraphQuerier, watchMode bool) *Tui {
+	p := tea.NewProgram(initialModel(q, watchMode), tea.WithAltScreen())
 
 	return &Tui{
 		program: p,
+		watch:   watchMode,
 		querier: q,
 	}
 }
@@ -59,7 +66,7 @@ func (t *Tui) Init() error {
 	return nil
 }
 
-func initialModel(q *GraphQuerier) model {
+func initialModel(q *GraphQuerier, watchMode bool) model {
 	ti := textinput.New()
 	ti.Placeholder = "Ask about your graph..."
 	ti.Focus()
@@ -74,11 +81,11 @@ func initialModel(q *GraphQuerier) model {
 		textInput: ti,
 		spinner:   s,
 		querier:   q,
+		watchMode: watchMode,
 		history:   []string{headerStyle.Render("--- Graph Analyzer Chat ---")},
 	}
 }
 
-// 4. THE UPDATE LOOP (Logic)
 func (m model) Init() tea.Cmd {
 	return textinput.Blink
 }
@@ -102,14 +109,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case tea.KeyEnter:
 			if m.isLoading {
-				return m, nil // Don't allow multiple inputs while loading
+				return m, nil
 			}
 			input := m.textInput.Value()
 			if strings.TrimSpace(input) == "" {
 				return m, nil
 			}
 
-			// Add User message to history
 			m.history = append(m.history, fmt.Sprintf("%s %s", userStyle.Render("You:"), input))
 			m.textInput.Reset()
 			m.isLoading = true
@@ -127,19 +133,31 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.WindowSizeMsg:
-		// Handle terminal resizing
-		if !m.isReady {
-			m.viewport = viewport.New(msg.Width, msg.Height-4)
-			m.isReady = true
+		m.height = msg.Height
+		m.width = msg.Width
+		if m.watchMode {
+			sidebarWidth := msg.Width / 3
+			chatWidth := msg.Width - sidebarWidth - 2 // -2 for borders/padding
+
+			// Update viewports with new dimensions
+			m.chatViewport.Width = chatWidth
+			m.chatViewport.Height = msg.Height - 5 // leave room for input field
+
+			m.sideViewport.Width = sidebarWidth
+			m.sideViewport.Height = msg.Height - 2
 		} else {
-			m.viewport.Width = msg.Width
-			m.viewport.Height = msg.Height - 4
+			if !m.isReady {
+				m.chatViewport = viewport.New(msg.Width, msg.Height-4)
+			} else {
+				m.chatViewport.Width = msg.Width
+				m.chatViewport.Height = msg.Height - 4
+			}
 		}
+		m.isReady = true
 	}
 
-	// Update sub-components
 	m.textInput, tiCmd = m.textInput.Update(msg)
-	m.viewport, vpCmd = m.viewport.Update(msg)
+	m.chatViewport, vpCmd = m.chatViewport.Update(msg)
 	if m.isLoading {
 		m.spinner, spCmd = m.spinner.Update(msg)
 	}
@@ -147,7 +165,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(tiCmd, vpCmd, spCmd)
 }
 
-// 5. THE VIEW (Rendering)
 func (m model) View() string {
 	if !m.isReady {
 		return "Initializing..."
@@ -160,12 +177,39 @@ func (m model) View() string {
 		loader = " " // Empty space when not loading
 	}
 
-	return fmt.Sprintf(
-		"%s\n\n%s\n\n%s",
-		m.viewport.View(),
-		loader,
-		m.textInput.View(),
+	if !m.watchMode {
+		return fmt.Sprintf(
+			"%s\n\n%s\n\n%s",
+			m.chatViewport.View(),
+			loader,
+			m.textInput.View())
+	}
+
+	chatBox := lipgloss.NewStyle().
+		Width(m.chatViewport.Width).
+		Padding(0, 1).
+		Render(fmt.Sprintf(
+			"%s\n\n%s\n\n%s",
+			m.chatViewport.View(),
+			loader,
+			m.textInput.View(),
+		))
+
+	sidebarStyle := lipgloss.NewStyle().
+		Border(lipgloss.NormalBorder(), false, false, false, true). // Left border only
+		BorderForeground(lipgloss.Color("240")).
+		Padding(0, 1).
+		Width(m.sideViewport.Width).
+		Height(m.height)
+
+	sidebarBox := sidebarStyle.Render(
+		lipgloss.JoinVertical(lipgloss.Left,
+			headerStyle.Render("LIVE FILE CHANGES"),
+			m.sideViewport.View(),
+		),
 	)
+
+	return lipgloss.JoinHorizontal(lipgloss.Top, chatBox, sidebarBox)
 }
 
 func (m model) queryGraph(query string) tea.Cmd {
@@ -185,6 +229,6 @@ func (m model) queryGraph(query string) tea.Cmd {
 // --- HELPER FUNCTIONS ---
 
 func (m *model) updateViewport() {
-	m.viewport.SetContent(strings.Join(m.history, "\n"))
-	m.viewport.GotoBottom()
+	m.chatViewport.SetContent(strings.Join(m.history, "\n"))
+	m.chatViewport.GotoBottom()
 }

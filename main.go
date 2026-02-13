@@ -16,6 +16,8 @@ import (
 func main() {
 	rootPath := flag.String("path", ".", "The root path of the project to analyze")
 	lang := flag.String("lang", ".", "The main language of the project")
+	watchMode := flag.Bool("watch", false, "Watch live changes to the project")
+	debugMode := flag.Bool("debug", false, "Turn on debug mode")
 
 	flag.Parse()
 
@@ -26,7 +28,7 @@ func main() {
 	assertions.Condition(!os.IsNotExist(err), fmt.Sprintf("Error: Path [%s] does not exist.\n", absPath))
 	assertions.Condition(info.IsDir(), fmt.Sprintf("Error: Path [%s] is a file, but a directory is required.\n", absPath))
 
-	logger.Init(true)
+	logger.Init(*debugMode)
 
 	logger.Info("Starting Analyzer on: %s", absPath)
 
@@ -37,12 +39,12 @@ func main() {
 
 	assertions.NonError(e, "Could not start service")
 
-	serviceWg, err := s.Orchestrate(ctx, absPath, *lang)
+	serviceWg, err := s.Orchestrate(ctx, absPath, *lang, *watchMode)
 
 	assertions.NonError(err, "Service gave an error while Orchestrating")
 
 	go func() {
-		e := runTUI(s.ProjectGraph)
+		e := runTUI(s.ProjectGraph, *watchMode)
 
 		if e != nil {
 			cancel()
@@ -58,9 +60,9 @@ func main() {
 	logger.Info("Bye!")
 }
 
-func runTUI(pg *graph.ProjectGraphAggregator) error {
+func runTUI(pg *graph.ProjectGraphAggregator, watchMode bool) error {
 	querier := chat.NewQuerier(pg)
-	t := chat.NewTui(querier)
+	t := chat.NewTui(querier, watchMode)
 
 	e := t.Init()
 

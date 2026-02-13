@@ -8,6 +8,7 @@ import (
 	"raidline/ripple/core/graph/creeper"
 	"raidline/ripple/core/graph/languages"
 	"raidline/ripple/errors"
+	"raidline/ripple/pgk/logger"
 	"sync"
 )
 
@@ -37,7 +38,12 @@ func NewService() (*Service, error) { // should receive params from input , tbd
 	}, nil
 }
 
-func (s *Service) Orchestrate(ctx context.Context, root string, lang string) (*sync.WaitGroup, error) {
+func (s *Service) Orchestrate(ctx context.Context,
+	root string, lang string, watchMode bool) (*sync.WaitGroup, error) {
+
+	//todo: in here we need to see if we already have the file serving as DB for the graph.
+	// if that is the case get the graph from there and run the below logic in a goroutine and update the graph in the background
+
 	log.Printf("creeping project in dir : [%s] for lang : [%s]", root, lang)
 	creepRes, err := creeper.CreepDir(root)
 
@@ -67,17 +73,22 @@ func (s *Service) Orchestrate(ctx context.Context, root string, lang string) (*s
 		return nil, gErr
 	}
 
+	//maintain the return of the WaitGroup,
+	// as per the improvements part we need to run in a goroutine the creeper to catch new changes that happened while the tool was not running
 	wg := &sync.WaitGroup{}
 
-	eventChan, wErr := s.watcher.Watch(ctx, creepRes.Dirs)
+	if watchMode {
+		logger.Debug("Watch mode enabled, listening for changes...")
+		eventChan, wErr := s.watcher.Watch(ctx, creepRes.Dirs)
 
-	if wErr != nil {
-		return nil, wErr
+		if wErr != nil {
+			return nil, wErr
+		}
+
+		wg.Go(func() {
+			s.listener.Listen(ctx, eventChan)
+		})
 	}
-
-	wg.Go(func() {
-		s.listener.Listen(ctx, eventChan)
-	})
 
 	return wg, nil
 }
