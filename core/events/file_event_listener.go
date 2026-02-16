@@ -40,6 +40,8 @@ func (fl *FileEventListener) Listen(ctx context.Context, fileChanged <-chan stri
 				logger.Info("File : [%s] impacts: \n", filename)
 				// verify if here we want to do a BFS or DFS to know the real impact of the file.
 				// This is just the direct impacts, which is fine, but we can (if requested) make a more deep find
+				//
+				// This is wrong these are not the impacts, the impact are every edge that this node is connected to
 				for _, edge := range fileVertice.Edges {
 					logger.Info("[%s] \n", edge.To.Node.ClassName)
 				}
@@ -56,5 +58,6 @@ func (fl *FileEventListener) Listen(ctx context.Context, fileChanged <-chan stri
 }
 
 func extractFilename(file string) string {
-	return strings.Split(file, ".")[0] // file.java, file.go, file.model.ts -> just "file"
+	splitted := strings.Split(file, "/")                    // /path/to/file/resources/test-files/InspectionZoneService.java
+	return strings.Split(splitted[len(splitted)-1], ".")[0] // file.java, file.go, file.model.ts -> just "file"
 }

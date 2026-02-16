@@ -68,26 +68,41 @@ func (f *FileWatcher) Watch(ctx context.Context, dirs []string) (<-chan string, 
 					continue
 				}
 
-				if event.Op&fsnotify.Create == fsnotify.Create {
+				if event.Op.Has(fsnotify.Rename) {
+					logger.Debug("file [%s] was renamed, we received this old path, Created event should be received next", event.Name)
+					// in here we should store this rename and wait for the respective create event
+					// in the create event we should take all the references of the old path and update them to the new path
+					continue
+				}
+
+				if event.Op.Has(fsnotify.Create) {
 					info, err := os.Stat(event.Name)
 					if err == nil && info.IsDir() {
 						f.fsWatcher.Add(event.Name)
 					}
 				}
 
+				if !event.Op.Has(fsnotify.Write) {
+					continue
+				}
+
+				// The pathname was written to; this does *not* mean the write has finished,
+				// and a write can be followed by more writes.
+				//
+				// we need to wait for the last write on this file. how?
 				info, err := os.Stat(event.Name)
 				if err == nil && info.IsDir() {
 					continue
 				}
 
-				changed, fileErr := hasFileNotChanged(ctx, event.Name)
+				changed, fileErr := hasFileChanged(ctx, event.Name)
 
 				if fileErr != nil {
 					logger.Error("Error on git verify: [%s]", err.Error())
 					return
 				}
 
-				if changed {
+				if !changed {
 					continue
 				}
 
@@ -107,12 +122,11 @@ func (f *FileWatcher) Watch(ctx context.Context, dirs []string) (<-chan string, 
 		}
 	}()
 
-	// 4. Return immediately
 	return outCh, nil
 }
 
 // Verify if change wasn't just a "touch" (where timestamp changed but content didn't).
-func hasFileNotChanged(ctx context.Context, file string) (bool, error) {
+func hasFileChanged(ctx context.Context, file string) (bool, error) {
 	cmd := exec.CommandContext(ctx, "git", "diff-index", "--quiet", "HEAD", "--", file) // see if we need to path
 
 	err := cmd.Run()
@@ -122,6 +136,7 @@ func hasFileNotChanged(ctx context.Context, file string) (bool, error) {
 
 	if exitError, ok := err.(*exec.ExitError); ok {
 		if exitError.ExitCode() == 1 {
+			logger.Debug("file [%s] has changed", file)
 			return true, nil
 		}
 	}

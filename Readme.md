@@ -8,8 +8,10 @@
 
 ## Improvements
 
+- [] Remove tests files (specific per language?, configurable by project)
+- [] Start script is not clear what params we are sending, make it more clear
 - [] Put the graph in a file (to serve as persistent storage) as rebuild like that to now creep the entire project again
-- [] Always run the raph building in background and compare to what we have (new files could have been added while the tool was not running)
+- [] Always run the graph building in background and compare to what we have (new files could have been added while the tool was not running)
 
 ## Optional
 
