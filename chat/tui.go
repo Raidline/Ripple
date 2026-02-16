@@ -3,7 +3,6 @@ package chat
 import (
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
@@ -214,8 +213,6 @@ func (m model) View() string {
 
 func (m model) queryGraph(query string) tea.Cmd {
 	return func() tea.Msg {
-		// Replace this with your actual graph search logic later
-		time.Sleep(1500 * time.Millisecond)
 		res, err := m.querier.Execute(query)
 
 		if err != nil {

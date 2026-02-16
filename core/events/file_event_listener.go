@@ -8,12 +8,12 @@ import (
 )
 
 type FileEventListener struct {
-	projectGraph *graph.ProjectGraphAggregator
+	graphQuerier graph.ProjectQuerier
 }
 
-func NewFileListener(pg *graph.ProjectGraphAggregator) (*FileEventListener, error) {
+func NewFileListener(pg graph.ProjectQuerier) (*FileEventListener, error) {
 	return &FileEventListener{
-		projectGraph: pg,
+		graphQuerier: pg,
 	}, nil
 }
 
@@ -36,21 +36,15 @@ func (fl *FileEventListener) Listen(ctx context.Context, fileChanged <-chan stri
 			logger.Info("Got event : [%s]...\n", file) // this is the filename (with extension)
 			filename := extractFilename(file)
 
-			if fileVertice, ok := fl.projectGraph.Graph.Vertices[filename]; ok {
-				logger.Info("File : [%s] impacts: \n", filename)
-				// verify if here we want to do a BFS or DFS to know the real impact of the file.
-				// This is just the direct impacts, which is fine, but we can (if requested) make a more deep find
-				//
-				// This is wrong these are not the impacts, the impact are every edge that this node is connected to
-				for _, edge := range fileVertice.Edges {
-					logger.Info("[%s] \n", edge.To.Node.ClassName)
+			logger.Info("File : [%s] impacts: \n", filename)
+
+			if fl.graphQuerier.Exists(filename) {
+				impacts := fl.graphQuerier.FindAllWithEdge(filename)
+
+				for _, f := range impacts {
+					logger.Info("[%s] \n", f)
 				}
 			} else {
-				// this can be a case where the file was added. In this case we just update the projectGraph
-				// todo: send update to the graph here
-				// When the Watcher updates a file, it should create a totally new GraphVertice object and replace the old one in the map.
-				//The TUI will keep holding the "old" version it was reading (which is safe, because that old slice isn't being modified anymore).
-				//The Map will now point to the "new" version.
 				logger.Info("The file we received update from is not in the graph. \n")
 			}
 		}

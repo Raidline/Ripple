@@ -2,12 +2,13 @@ package events
 
 import (
 	"context"
+	"math"
 	"os"
-	"os/exec"
-	"raidline/ripple/core/graph"
 	"raidline/ripple/errors"
 	"raidline/ripple/pgk/logger"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/fsnotify/fsnotify"
 )
@@ -16,7 +17,7 @@ type FileWatcher struct {
 	fsWatcher *fsnotify.Watcher
 }
 
-func NewWatcher(pg *graph.ProjectGraphAggregator) (*FileWatcher, error) {
+func NewWatcher() (*FileWatcher, error) {
 	fswatcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		return nil, err
@@ -37,6 +38,25 @@ func NewWatcher(pg *graph.ProjectGraphAggregator) (*FileWatcher, error) {
 //
 // Returns a channel that is triggered when a change happens to a certain file, or error
 func (f *FileWatcher) Watch(ctx context.Context, dirs []string) (<-chan string, error) {
+	outCh := make(chan string, 10)
+
+	var (
+		// Wait 100ms for new events; each new event resets the timer.
+		waitFor = 100 * time.Millisecond
+
+		// Keep track of the timers, as path → timer.
+		mu     sync.Mutex
+		timers = make(map[string]*time.Timer)
+
+		// Callback we run once timer has ended.
+		writeEvent = func(e fsnotify.Event) {
+			mu.Lock()
+			delete(timers, e.Name)
+			mu.Unlock()
+
+			outCh <- e.Name
+		}
+	)
 
 	if len(dirs) == 0 {
 		return nil, errors.NewEmptySequenceError("directory paths")
@@ -47,8 +67,6 @@ func (f *FileWatcher) Watch(ctx context.Context, dirs []string) (<-chan string, 
 			return nil, err
 		}
 	}
-
-	outCh := make(chan string, 10)
 
 	go func() {
 		defer close(outCh)        // Close channel when loop exits
@@ -76,6 +94,11 @@ func (f *FileWatcher) Watch(ctx context.Context, dirs []string) (<-chan string, 
 				}
 
 				if event.Op.Has(fsnotify.Create) {
+					// this can be a case where the file was added. In this case we just update the projectGraph
+					// todo: send update to the graph here
+					// When the Watcher updates a file, it should create a totally new GraphVertice object and replace the old one in the map.
+					//The TUI will keep holding the "old" version it was reading (which is safe, because that old slice isn't being modified anymore).
+					//The Map will now point to the "new" version.
 					info, err := os.Stat(event.Name)
 					if err == nil && info.IsDir() {
 						f.fsWatcher.Add(event.Name)
@@ -89,28 +112,27 @@ func (f *FileWatcher) Watch(ctx context.Context, dirs []string) (<-chan string, 
 				// The pathname was written to; this does *not* mean the write has finished,
 				// and a write can be followed by more writes.
 				//
-				// we need to wait for the last write on this file. how?
+				// we need to wait for the last write on this file.
 				info, err := os.Stat(event.Name)
 				if err == nil && info.IsDir() {
 					continue
 				}
 
-				changed, fileErr := hasFileChanged(ctx, event.Name)
+				// Get timer.
+				mu.Lock()
+				t, ok := timers[event.Name]
+				mu.Unlock()
 
-				if fileErr != nil {
-					logger.Error("Error on git verify: [%s]", err.Error())
-					return
+				if !ok {
+					t = time.AfterFunc(math.MaxInt64, func() { writeEvent(event) })
+					t.Stop()
+
+					mu.Lock()
+					timers[event.Name] = t
+					mu.Unlock()
 				}
 
-				if !changed {
-					continue
-				}
-
-				select {
-				case outCh <- event.Name:
-				case <-ctx.Done():
-					return
-				}
+				t.Reset(waitFor)
 
 			case err, ok := <-f.fsWatcher.Errors:
 				if !ok {
@@ -123,23 +145,4 @@ func (f *FileWatcher) Watch(ctx context.Context, dirs []string) (<-chan string, 
 	}()
 
 	return outCh, nil
-}
-
-// Verify if change wasn't just a "touch" (where timestamp changed but content didn't).
-func hasFileChanged(ctx context.Context, file string) (bool, error) {
-	cmd := exec.CommandContext(ctx, "git", "diff-index", "--quiet", "HEAD", "--", file) // see if we need to path
-
-	err := cmd.Run()
-	if err == nil {
-		return false, nil
-	}
-
-	if exitError, ok := err.(*exec.ExitError); ok {
-		if exitError.ExitCode() == 1 {
-			logger.Debug("file [%s] has changed", file)
-			return true, nil
-		}
-	}
-
-	return false, err
 }

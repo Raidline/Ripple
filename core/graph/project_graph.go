@@ -7,22 +7,100 @@ import (
 	"raidline/ripple/core/graph/model"
 	"raidline/ripple/errors"
 	"raidline/ripple/pgk/logger"
+	"raidline/ripple/pgk/structures"
+	"slices"
 	"strings"
 )
 
-type ProjectGraphAggregator struct {
-	Graph *model.ProjectGraph
+type ProjectQuerier interface {
+	Exists(filename string) bool
+	FindAllWithEdge(filename string) []string
 }
 
-func Create() *ProjectGraphAggregator {
-	return &ProjectGraphAggregator{
-		Graph: &model.ProjectGraph{
+type ProjectGraphWriter interface {
+	Aggregate(files []*model.FileScan, wantedLang languages.Language) error
+}
+
+type ProjectGraph struct {
+	graph *model.ProjectGraph
+}
+
+func CreateProjectGraph() *ProjectGraph {
+	return &ProjectGraph{
+		graph: &model.ProjectGraph{
 			Vertices: make(map[string]*model.GraphVertice, 0),
 		},
 	}
 }
 
-func (agg *ProjectGraphAggregator) Aggregate(files []*model.FileScan, wantedLang languages.Language) error {
+// --- Graph read operations --- \\
+func (pg *ProjectGraph) FindAllWithEdge(filename string) []string {
+	if len(pg.graph.Vertices) == 0 {
+		return make([]string, 0)
+	}
+	source := pg.graph.Vertices[filename]
+
+	q := structures.NewQueue[*model.GraphVertice]()
+	seen := make(map[string]bool, len(pg.graph.Vertices))
+	prev := make(map[string]*model.GraphVertice, len(pg.graph.Vertices))
+	result := make([]string, 0)
+
+	for i := range prev {
+		prev[i] = nil
+	}
+
+	seen[source.Node.ClassName] = true
+	q.Enqueue(source)
+
+	for q.Length > 0 {
+
+		curr, err := q.Deque()
+
+		if err != nil { // no more items
+			break
+		}
+
+		seen[curr.Node.ClassName] = true
+
+		for _, v := range pg.graph.Vertices[curr.Node.ClassName].Edges {
+
+			if seen[v.From.Node.ClassName] {
+				continue
+			}
+
+			seen[v.From.Node.ClassName] = true
+			prev[v.From.Node.ClassName] = curr
+
+			q.Enqueue(v.From)
+		}
+	}
+
+	curr := pg.graph.Vertices[filename]
+	out := make([]string, 0)
+
+	for prev[curr.Node.ClassName] != nil {
+		out = append(out, curr.Node.ClassName)
+		curr = prev[curr.Node.ClassName]
+	}
+
+	if len(out) == 0 {
+		return []string{}
+	}
+
+	out = append(out, source.Node.ClassName)
+	slices.Reverse(out)
+
+	return result
+}
+
+func (pg *ProjectGraph) Exists(filename string) bool {
+	_, ok := pg.graph.Vertices[filename]
+
+	return ok
+}
+
+// --- Graph write operations --- \\
+func (agg *ProjectGraph) Aggregate(files []*model.FileScan, wantedLang languages.Language) error {
 
 	if files == nil {
 		return errors.NewEmptySequenceError("files sequence")
@@ -43,13 +121,13 @@ func (agg *ProjectGraphAggregator) Aggregate(files []*model.FileScan, wantedLang
 	agg.createProjectGraph(fileNameToFileScan, fileAnalyser, wantedLang)
 
 	go func() {
-		debugProjectGraph(agg.Graph)
+		debugProjectGraph(agg.graph)
 	}()
 
 	return nil
 }
 
-func (agg *ProjectGraphAggregator) createProjectGraph(
+func (agg *ProjectGraph) createProjectGraph(
 	fileNameToFileScan map[string]*model.FileScan,
 	fileAnalyser languages.LanguageAnalyser,
 	wantedLang languages.Language) error {
@@ -67,7 +145,7 @@ func (agg *ProjectGraphAggregator) createProjectGraph(
 	return nil
 }
 
-func (agg *ProjectGraphAggregator) createGraphForFile(fileScan *model.FileScan,
+func (agg *ProjectGraph) createGraphForFile(fileScan *model.FileScan,
 	seen map[string]bool,
 	fileNameToFileScan map[string]*model.FileScan,
 	fileAnalyser languages.LanguageAnalyser,
@@ -87,7 +165,7 @@ func (agg *ProjectGraphAggregator) createGraphForFile(fileScan *model.FileScan,
 		return nil, fileGErr
 	}
 
-	if vertice, ok := agg.Graph.Vertices[fileGraph.ClassName]; ok {
+	if vertice, ok := agg.graph.Vertices[fileGraph.ClassName]; ok {
 		// this might already exist but as a from dependency, now we need to add the to's
 		agg.connectEdgesToVertice(vertice, fileNameToFileScan, fileGraph, func(fileScan *model.FileScan) (*model.GraphVertice, error) {
 			return agg.createGraphForFile(fileScan, seen, fileNameToFileScan, fileAnalyser, wantedLang)
@@ -102,7 +180,7 @@ func (agg *ProjectGraphAggregator) createGraphForFile(fileScan *model.FileScan,
 			Edges: make([]model.GraphEdge, 0),
 		}
 		// todo(the fields and method info to get the weight of each import)
-		agg.Graph.Vertices[fileGraph.ClassName] = v
+		agg.graph.Vertices[fileGraph.ClassName] = v
 
 		//Edges will be added by memory reference
 		agg.connectEdgesToVertice(v, fileNameToFileScan, fileGraph, func(fileScan *model.FileScan) (*model.GraphVertice, error) {
@@ -115,7 +193,7 @@ func (agg *ProjectGraphAggregator) createGraphForFile(fileScan *model.FileScan,
 	}
 }
 
-func (agg *ProjectGraphAggregator) connectEdgesToVertice(vert *model.GraphVertice,
+func (agg *ProjectGraph) connectEdgesToVertice(vert *model.GraphVertice,
 	fileNameToFileScan map[string]*model.FileScan,
 	fileGraph *model.ClassGraph, cb func(fileScan *model.FileScan) (*model.GraphVertice, error)) error {
 
@@ -129,7 +207,7 @@ func (agg *ProjectGraphAggregator) connectEdgesToVertice(vert *model.GraphVertic
 
 	for name, scan := range fieldToDependency {
 
-		if vertice, ok := agg.Graph.Vertices[name]; ok {
+		if vertice, ok := agg.graph.Vertices[name]; ok {
 			vert.Edges = append(vert.Edges, model.GraphEdge{
 				To:     vertice,
 				From:   vert,

@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"raidline/ripple/chat"
 	"raidline/ripple/core"
+	"raidline/ripple/core/events"
 	"raidline/ripple/core/graph"
 	"raidline/ripple/pgk/assertions"
 	"raidline/ripple/pgk/logger"
@@ -35,7 +36,19 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	s, e := core.NewService()
+	pg := graph.CreateProjectGraph()
+	fileChangesWatcher, err := events.NewWatcher()
+	fileEventListener, lErr := events.NewFileListener(pg)
+
+	if err != nil {
+		panic(err)
+	}
+
+	if lErr != nil {
+		panic(lErr)
+	}
+
+	s, e := core.NewService(pg, fileChangesWatcher, fileEventListener)
 
 	assertions.NonError(e, "Could not start service")
 
@@ -44,7 +57,7 @@ func main() {
 	assertions.NonError(err, "Service gave an error while Orchestrating")
 
 	go func() {
-		e := runTUI(s.ProjectGraph, *watchMode)
+		e := runTUI(pg, *watchMode)
 
 		if e != nil {
 			cancel()
@@ -60,7 +73,7 @@ func main() {
 	logger.Info("Bye!")
 }
 
-func runTUI(pg *graph.ProjectGraphAggregator, watchMode bool) error {
+func runTUI(pg graph.ProjectQuerier, watchMode bool) error {
 	querier := chat.NewQuerier(pg)
 	t := chat.NewTui(querier, watchMode)
 

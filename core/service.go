@@ -13,28 +13,16 @@ import (
 )
 
 type Service struct {
-	ProjectGraph *graph.ProjectGraphAggregator
-	watcher      *events.FileWatcher
-	listener     *events.FileEventListener
+	aggregator graph.ProjectGraphWriter
+	watcher    *events.FileWatcher
+	listener   *events.FileEventListener
 }
 
-func NewService() (*Service, error) { // should receive params from input , tbd
-	graphAggregator := graph.Create()
-	fileWatcher, err := events.NewWatcher(graphAggregator)
-	listener, lErr := events.NewFileListener(graphAggregator)
-
-	if err != nil {
-		return nil, err
-	}
-
-	if lErr != nil {
-		return nil, lErr
-	}
-
+func NewService(pg graph.ProjectGraphWriter, watcher *events.FileWatcher, listener *events.FileEventListener) (*Service, error) { // should receive params from input , tbd
 	return &Service{
-		ProjectGraph: graphAggregator,
-		watcher:      fileWatcher,
-		listener:     listener,
+		aggregator: pg,
+		watcher:    watcher,
+		listener:   listener,
 	}, nil
 }
 
@@ -44,11 +32,28 @@ func (s *Service) Orchestrate(ctx context.Context,
 	//todo: in here we need to see if we already have the file serving as DB for the graph.
 	// if that is the case get the graph from there and run the below logic in a goroutine and update the graph in the background
 
+	//maintain the return of the WaitGroup,
+	// as per the improvements part we need to run in a goroutine the creeper to catch new changes that happened while the tool was not running
+	wg := &sync.WaitGroup{}
+
 	log.Printf("creeping project in dir : [%s] for lang : [%s]", root, lang)
 	creepRes, err := creeper.CreepDir(root)
 
 	if err != nil {
 		return nil, err
+	}
+
+	if watchMode {
+		logger.Debug("Watch mode enabled, listening for changes...")
+		eventChan, wErr := s.watcher.Watch(ctx, creepRes.Dirs)
+
+		if wErr != nil {
+			panic(wErr)
+		}
+
+		wg.Go(func() {
+			s.listener.Listen(ctx, eventChan)
+		})
 	}
 
 	var languageErr error
@@ -67,27 +72,10 @@ func (s *Service) Orchestrate(ctx context.Context,
 	}
 
 	//todo: in a optimal world we would get the lang by creeping the project.
-	gErr := s.ProjectGraph.Aggregate(creepRes.Files, wantedLang)
+	gErr := s.aggregator.Aggregate(creepRes.Files, wantedLang)
 
 	if gErr != nil {
 		return nil, gErr
-	}
-
-	//maintain the return of the WaitGroup,
-	// as per the improvements part we need to run in a goroutine the creeper to catch new changes that happened while the tool was not running
-	wg := &sync.WaitGroup{}
-
-	if watchMode {
-		logger.Debug("Watch mode enabled, listening for changes...")
-		eventChan, wErr := s.watcher.Watch(ctx, creepRes.Dirs)
-
-		if wErr != nil {
-			return nil, wErr
-		}
-
-		wg.Go(func() {
-			s.listener.Listen(ctx, eventChan)
-		})
 	}
 
 	return wg, nil
