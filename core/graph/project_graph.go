@@ -34,7 +34,7 @@ func CreateProjectGraph() *ProjectGraph {
 }
 
 // --- Graph read operations --- \\
-func (pg *ProjectGraph) FindAllWithEdge(filename string) []string {
+func (pg *ProjectGraph) FindAllWithEdge(filename string) []string { // this will be updated now (O(V x E) -  will create a more direct bidirectional relation to improve speed)
 	if len(pg.graph.Vertices) == 0 {
 		return make([]string, 0)
 	}
@@ -101,6 +101,8 @@ func (pg *ProjectGraph) Exists(filename string) bool {
 
 // --- Graph write operations --- \\
 func (agg *ProjectGraph) Aggregate(files []*model.FileScan, wantedLang languages.Language) error {
+
+	//todo: make where the file is used relation
 
 	if files == nil {
 		return errors.NewEmptySequenceError("files sequence")
@@ -240,7 +242,7 @@ func debugProjectGraph(graph *model.ProjectGraph) {
 
 	if graph == nil || len(graph.Vertices) == 0 {
 		sb.WriteString("Graph is empty.\n")
-		logger.Debug(sb.String())
+		logger.Debug("%s", sb.String())
 		return
 	}
 
@@ -276,5 +278,5 @@ func debugProjectGraph(graph *model.ProjectGraph) {
 
 	sb.WriteString("--- End of Snapshot ---\n")
 
-	logger.Debug(sb.String())
+	logger.Debug("%s", sb.String())
 }
