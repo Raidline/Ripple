@@ -17,8 +17,9 @@ type GraphEdge struct {
 }
 
 type GraphVertice struct {
-	Node  *ClassGraph
-	Edges []GraphEdge
+	Node         *ClassGraph
+	Edges        []GraphEdge
+	InboundEdges []GraphEdge
 }
 
 type ProjectGraph struct {

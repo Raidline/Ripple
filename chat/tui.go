@@ -100,6 +100,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		spCmd tea.Cmd
 	)
 
+	//todo: in here, we need to create a goFunc that would listen for said channel and update the TUI
+	// TUI should receive the channel ready to go, we might need somehere we can create it and control it
+
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.Type {

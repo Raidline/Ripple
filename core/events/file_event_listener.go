@@ -17,9 +17,9 @@ func NewFileListener(pg graph.ProjectQuerier) (*FileEventListener, error) {
 	}, nil
 }
 
-//events will maybe be another type, because we need the file name to go to the graph
-
-func (fl *FileEventListener) Listen(ctx context.Context, fileChanged <-chan string) { // for now we assume this is the file name
+// events will maybe be another type, because we need the file name to go to the graph
+func (fl *FileEventListener) Listen(ctx context.Context, fileChanged <-chan string,
+	outCh chan []string) {
 	logger.Info("Ready and listening...")
 
 	for {
@@ -40,10 +40,7 @@ func (fl *FileEventListener) Listen(ctx context.Context, fileChanged <-chan stri
 
 			if fl.graphQuerier.Exists(filename) {
 				impacts := fl.graphQuerier.FindAllWithEdge(filename)
-
-				for _, f := range impacts {
-					logger.Info("[%s] \n", f)
-				}
+				outCh <- impacts
 			} else {
 				logger.Info("The file we received update from is not in the graph. \n")
 			}

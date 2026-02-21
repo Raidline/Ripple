@@ -7,8 +7,6 @@ import (
 	"raidline/ripple/core/graph/model"
 	"raidline/ripple/errors"
 	"raidline/ripple/pgk/logger"
-	"raidline/ripple/pgk/structures"
-	"slices"
 	"strings"
 )
 
@@ -34,63 +32,23 @@ func CreateProjectGraph() *ProjectGraph {
 }
 
 // --- Graph read operations --- \\
-func (pg *ProjectGraph) FindAllWithEdge(filename string) []string { // this will be updated now (O(V x E) -  will create a more direct bidirectional relation to improve speed)
+func (pg *ProjectGraph) FindAllWithEdge(filename string) []string {
 	if len(pg.graph.Vertices) == 0 {
 		return make([]string, 0)
 	}
-	source := pg.graph.Vertices[filename]
-
-	q := structures.NewQueue[*model.GraphVertice]()
-	seen := make(map[string]bool, len(pg.graph.Vertices))
-	prev := make(map[string]*model.GraphVertice, len(pg.graph.Vertices))
-	result := make([]string, 0)
-
-	for i := range prev {
-		prev[i] = nil
+	target, exists := pg.graph.Vertices[filename]
+	if !exists {
+		return nil
 	}
 
-	seen[source.Node.ClassName] = true
-	q.Enqueue(source)
-
-	for q.Length > 0 {
-
-		curr, err := q.Deque()
-
-		if err != nil { // no more items
+	var dependents []string
+	for _, edge := range target.InboundEdges {
+		if edge.To == target {
+			dependents = append(dependents, edge.From.Node.ClassName)
 			break
 		}
-
-		seen[curr.Node.ClassName] = true
-
-		for _, v := range pg.graph.Vertices[curr.Node.ClassName].Edges {
-
-			if seen[v.From.Node.ClassName] {
-				continue
-			}
-
-			seen[v.From.Node.ClassName] = true
-			prev[v.From.Node.ClassName] = curr
-
-			q.Enqueue(v.From)
-		}
 	}
-
-	curr := pg.graph.Vertices[filename]
-	out := make([]string, 0)
-
-	for prev[curr.Node.ClassName] != nil {
-		out = append(out, curr.Node.ClassName)
-		curr = prev[curr.Node.ClassName]
-	}
-
-	if len(out) == 0 {
-		return []string{}
-	}
-
-	out = append(out, source.Node.ClassName)
-	slices.Reverse(out)
-
-	return result
+	return dependents
 }
 
 func (pg *ProjectGraph) Exists(filename string) bool {
@@ -210,11 +168,15 @@ func (agg *ProjectGraph) connectEdgesToVertice(vert *model.GraphVertice,
 	for name, scan := range fieldToDependency {
 
 		if vertice, ok := agg.graph.Vertices[name]; ok {
-			vert.Edges = append(vert.Edges, model.GraphEdge{
+
+			edge := model.GraphEdge{
 				To:     vertice,
 				From:   vert,
 				Weight: 0, // should be the count of times this import is used
-			})
+			}
+
+			vert.Edges = append(vert.Edges, edge)
+			vertice.InboundEdges = append(vertice.InboundEdges, edge)
 		} else {
 			//build the file
 			newVertice, e := cb(scan) //todo: if we see this causes to much memory or time, we can skip this node here and implement the logic where we see if this node is already connected to any another node and make that connection
@@ -224,11 +186,14 @@ func (agg *ProjectGraph) connectEdgesToVertice(vert *model.GraphVertice,
 				return e
 			}
 
-			vert.Edges = append(vert.Edges, model.GraphEdge{
+			edge := model.GraphEdge{
 				To:     newVertice,
 				From:   vert,
 				Weight: 0, // should be the count of times this import is used
-			})
+			}
+
+			vert.Edges = append(vert.Edges, edge)
+			newVertice.InboundEdges = append(newVertice.InboundEdges, edge)
 		}
 	}
 
@@ -251,10 +216,10 @@ func debugProjectGraph(graph *model.ProjectGraph) {
 		nameMap[v] = name
 	}
 
-	sb.WriteString(fmt.Sprintf("Total Vertices: %d\n", len(graph.Vertices)))
+	fmt.Fprintf(&sb, "Total Vertices: %d\n", len(graph.Vertices))
 
 	for filename, vertex := range graph.Vertices {
-		sb.WriteString(fmt.Sprintf("%s\n", filename))
+		fmt.Fprintf(&sb, "%s\n", filename)
 
 		if len(vertex.Edges) == 0 {
 			sb.WriteString("  └── (no dependencies)\n")
@@ -272,7 +237,7 @@ func debugProjectGraph(graph *model.ProjectGraph) {
 				targetName = "External/Unknown"
 			}
 
-			sb.WriteString(fmt.Sprintf("%s %s (w:%d)\n", connector, targetName, edge.Weight))
+			fmt.Fprintf(&sb, "%s %s (w:%d)\n", connector, targetName, edge.Weight)
 		}
 	}
 
