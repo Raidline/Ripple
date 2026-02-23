@@ -24,16 +24,17 @@ type responseMsg string
 
 // 3. THE MODEL (State)
 type model struct {
-	chatViewport viewport.Model
-	watchMode    bool
-	sideViewport viewport.Model // For the file change logs
-	textInput    textinput.Model
-	spinner      spinner.Model
-	history      []string
-	err          error
-	isReady      bool
-	isLoading    bool
-	querier      *GraphQuerier
+	chatViewport    viewport.Model
+	watchMode       bool
+	sideViewport    viewport.Model // For the file change logs
+	textInput       textinput.Model
+	spinner         spinner.Model
+	history         []string
+	err             error
+	isReady         bool
+	isLoading       bool
+	querier         *GraphQuerier
+	fileChangesChan <-chan []string
 
 	width  int
 	height int
@@ -45,8 +46,9 @@ type Tui struct {
 	querier *GraphQuerier
 }
 
-func NewTui(q *GraphQuerier, watchMode bool) *Tui {
-	p := tea.NewProgram(initialModel(q, watchMode), tea.WithAltScreen())
+// todo: this should be better structured, very whacky
+func NewTui(q *GraphQuerier, watchMode bool, fileChangesChan <-chan []string) *Tui {
+	p := tea.NewProgram(initialModel(q, watchMode, fileChangesChan), tea.WithAltScreen())
 
 	return &Tui{
 		program: p,
@@ -65,7 +67,7 @@ func (t *Tui) Init() error {
 	return nil
 }
 
-func initialModel(q *GraphQuerier, watchMode bool) model {
+func initialModel(q *GraphQuerier, watchMode bool, fileChangesChan <-chan []string) model {
 	ti := textinput.New()
 	ti.Placeholder = "Ask about your graph..."
 	ti.Focus()
@@ -77,11 +79,12 @@ func initialModel(q *GraphQuerier, watchMode bool) model {
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 
 	return model{
-		textInput: ti,
-		spinner:   s,
-		querier:   q,
-		watchMode: watchMode,
-		history:   []string{headerStyle.Render("--- Graph Analyzer Chat ---")},
+		textInput:       ti,
+		spinner:         s,
+		querier:         q,
+		watchMode:       watchMode,
+		history:         []string{headerStyle.Render("--- Graph Analyzer Chat ---")},
+		fileChangesChan: fileChangesChan,
 	}
 }
 
@@ -102,6 +105,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	//todo: in here, we need to create a goFunc that would listen for said channel and update the TUI
 	// TUI should receive the channel ready to go, we might need somehere we can create it and control it
+
+	go func() {
+		//todo: we should have a string[] for the live chat things
+	}()
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:

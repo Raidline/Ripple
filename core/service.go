@@ -12,6 +12,11 @@ import (
 	"sync"
 )
 
+type StateControl struct {
+	Wg         *sync.WaitGroup
+	WatcherRes <-chan []string
+}
+
 type Service struct {
 	aggregator graph.ProjectGraphWriter
 	watcher    *events.FileWatcher
@@ -27,14 +32,16 @@ func NewService(pg graph.ProjectGraphWriter, watcher *events.FileWatcher, listen
 }
 
 func (s *Service) Orchestrate(ctx context.Context,
-	root string, lang string, watchMode bool) (*sync.WaitGroup, error) {
+	root string, lang string, watchMode bool) (*StateControl, error) {
 
 	//todo: in here we need to see if we already have the file serving as DB for the graph.
 	// if that is the case get the graph from there and run the below logic in a goroutine and update the graph in the background
 
 	//maintain the return of the WaitGroup,
 	// as per the improvements part we need to run in a goroutine the creeper to catch new changes that happened while the tool was not running
+	st := &StateControl{}
 	wg := &sync.WaitGroup{}
+	st.Wg = wg
 
 	log.Printf("creeping project in dir : [%s] for lang : [%s]", root, lang)
 	creepRes, err := creeper.CreepDir(root)
@@ -44,6 +51,7 @@ func (s *Service) Orchestrate(ctx context.Context,
 	}
 
 	if watchMode {
+		watcherChan := make(chan []string)
 		logger.Debug("Watch mode enabled, listening for changes...")
 		eventChan, wErr := s.watcher.Watch(ctx, creepRes.Dirs)
 
@@ -51,8 +59,9 @@ func (s *Service) Orchestrate(ctx context.Context,
 			panic(wErr)
 		}
 
+		st.WatcherRes = watcherChan
 		wg.Go(func() {
-			s.listener.Listen(ctx, eventChan)
+			s.listener.Listen(ctx, eventChan, watcherChan)
 		})
 	}
 
@@ -78,5 +87,5 @@ func (s *Service) Orchestrate(ctx context.Context,
 		return nil, gErr
 	}
 
-	return wg, nil
+	return st, nil
 }

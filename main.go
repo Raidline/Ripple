@@ -52,12 +52,13 @@ func main() {
 
 	assertions.NonError(e, "Could not start service")
 
-	serviceWg, err := s.Orchestrate(ctx, absPath, *lang, *watchMode)
+	//todo: maybe service could return a struct that contains everything that we would need to control the TUI
+	serviceSt, err := s.Orchestrate(ctx, absPath, *lang, *watchMode)
 
 	assertions.NonError(err, "Service gave an error while Orchestrating")
 
 	go func() {
-		e := runTUI(pg, *watchMode)
+		e := runTUI(pg, *watchMode, serviceSt.WatcherRes)
 
 		if e != nil {
 			cancel()
@@ -69,13 +70,13 @@ func main() {
 	<-ctx.Done()
 
 	logger.Info("Shutting down background services...")
-	serviceWg.Wait()
+	serviceSt.Wg.Wait()
 	logger.Info("Bye!")
 }
 
-func runTUI(pg graph.ProjectQuerier, watchMode bool) error {
+func runTUI(pg graph.ProjectQuerier, watchMode bool, fileChangesChan <-chan []string) error {
 	querier := chat.NewQuerier(pg)
-	t := chat.NewTui(querier, watchMode)
+	t := chat.NewTui(querier, watchMode, fileChangesChan)
 
 	e := t.Init()
 
