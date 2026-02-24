@@ -30,6 +30,7 @@ type model struct {
 	textInput       textinput.Model
 	spinner         spinner.Model
 	history         []string
+	liveChanges     []string
 	err             error
 	isReady         bool
 	isLoading       bool
@@ -84,6 +85,7 @@ func initialModel(q *GraphQuerier, watchMode bool, fileChangesChan <-chan []stri
 		querier:         q,
 		watchMode:       watchMode,
 		history:         []string{headerStyle.Render("--- Graph Analyzer Chat ---")},
+		liveChanges:     []string{headerStyle.Render("--- Project Live changes ---")},
 		fileChangesChan: fileChangesChan,
 	}
 }
@@ -107,7 +109,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// TUI should receive the channel ready to go, we might need somehere we can create it and control it
 
 	go func() {
-		//todo: we should have a string[] for the live chat things
+		for _, change := range <-m.fileChangesChan {
+			m.liveChanges = append(m.liveChanges, change)
+			m.updateSideViewport()
+		}
 	}()
 
 	switch msg := msg.(type) {
@@ -140,7 +145,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.history = append(m.history, fmt.Sprintf("%s %s", aiStyle.Render("AI:"), string(msg)))
 		m.updateViewport()
 		return m, nil
-
 	case tea.WindowSizeMsg:
 		m.height = msg.Height
 		m.width = msg.Width
@@ -238,4 +242,8 @@ func (m model) queryGraph(query string) tea.Cmd {
 func (m *model) updateViewport() {
 	m.chatViewport.SetContent(strings.Join(m.history, "\n"))
 	m.chatViewport.GotoBottom()
+}
+
+func (m *model) updateSideViewport() {
+	m.sideViewport.SetContent(strings.Join(m.liveChanges, "\n"))
 }
