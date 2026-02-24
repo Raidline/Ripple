@@ -201,47 +201,65 @@ func (agg *ProjectGraph) connectEdgesToVertice(vert *model.GraphVertice,
 }
 
 func debugProjectGraph(graph *model.ProjectGraph) {
-	var sb strings.Builder
-
-	sb.WriteString("\n--- Project Graph Snapshot ---\n")
-
 	if graph == nil || len(graph.Vertices) == 0 {
-		sb.WriteString("Graph is empty.\n")
-		logger.Debug("%s", sb.String())
-		return
+		logger.Debug("--- 🕸️ Project Graph is Empty ---\n")
 	}
 
+	var sb strings.Builder
+	sb.WriteString("\n=== 🕸️  PROJECT GRAPH SNAPSHOT ===\n")
+	fmt.Fprintf(&sb, "Total Vertices: %d\n\n", len(graph.Vertices))
+
+	// 1. Create a reverse-lookup map to translate memory pointers back to filenames.
+	// This makes the lookup O(1) instead of searching the map for every single edge.
 	nameMap := make(map[*model.GraphVertice]string)
 	for name, v := range graph.Vertices {
 		nameMap[v] = name
 	}
 
-	fmt.Fprintf(&sb, "Total Vertices: %d\n", len(graph.Vertices))
+	// Helper function to safely get a name from a pointer
+	getName := func(v *model.GraphVertice) string {
+		if name, exists := nameMap[v]; exists {
+			return name
+		}
+		return "<Unknown/Dangling Pointer>"
+	}
 
+	// 2. Iterate through every file in the graph
 	for filename, vertex := range graph.Vertices {
-		fmt.Fprintf(&sb, "%s\n", filename)
+		fmt.Fprintf(&sb, "📍 [%s]\n", filename)
 
+		// --- OUTBOUND EDGES (Files this file depends on) ---
+		sb.WriteString("   ├─ Outbound (Depends on):\n")
 		if len(vertex.Edges) == 0 {
-			sb.WriteString("  └── (no dependencies)\n")
-			continue
+			sb.WriteString("   │  └─ (none)\n")
+		} else {
+			for i, edge := range vertex.Edges {
+				connector := "   │  ├─▶"
+				if i == len(vertex.Edges)-1 {
+					connector = "   │  └─▶"
+				}
+				fmt.Fprintf(&sb, "%s %s\n", connector, getName(edge.To))
+			}
 		}
 
-		for i, edge := range vertex.Edges {
-			connector := "  ├──"
-			if i == len(vertex.Edges)-1 {
-				connector = "  └──"
+		// --- INBOUND EDGES (Files that depend on this file) ---
+		sb.WriteString("   └─ Inbound (Used by):\n")
+		if len(vertex.InboundEdges) == 0 {
+			sb.WriteString("      └─ (none)\n\n")
+		} else {
+			for i, edge := range vertex.InboundEdges {
+				connector := "      ├─◀"
+				if i == len(vertex.InboundEdges)-1 {
+					connector = "      └─◀"
+				}
+				// Notice we use edge.From here, because it's an inbound connection
+				fmt.Fprintf(&sb, "%s %s\n", connector, getName(edge.From))
 			}
-
-			targetName := nameMap[edge.To]
-			if targetName == "" {
-				targetName = "External/Unknown"
-			}
-
-			fmt.Fprintf(&sb, "%s %s (w:%d)\n", connector, targetName, edge.Weight)
+			sb.WriteString("\n") // Extra newline for spacing between files
 		}
 	}
 
-	sb.WriteString("--- End of Snapshot ---\n")
+	sb.WriteString("==================================\n")
 
 	logger.Debug("%s", sb.String())
 }
