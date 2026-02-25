@@ -33,10 +33,10 @@ func (fl *FileEventListener) Listen(ctx context.Context, fileChanged <-chan stri
 				return
 			}
 
-			logger.Info("Got event : [%s]...\n", file) // this is the filename (with extension)
+			logger.Debug("Got event : [%s]...\n", file) // this is the filename (with extension)
 			filename := extractFilename(file)
 
-			logger.Info("File : [%s] impacts: \n", filename)
+			logger.Debug("File : [%s] impacts: \n", filename)
 
 			if fl.graphQuerier.Exists(filename) {
 				impacts := fl.graphQuerier.FindAllWithEdge(filename)

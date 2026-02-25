@@ -51,6 +51,7 @@ func (s *Service) Orchestrate(ctx context.Context,
 	}
 
 	if watchMode {
+		//todo: the creation of this chan does not make sense! we need to refactor the BE before doing this, it is very messy now
 		watcherChan := make(chan []string)
 		logger.Debug("Watch mode enabled, listening for changes...")
 		eventChan, wErr := s.watcher.Watch(ctx, creepRes.Dirs)

@@ -2,6 +2,7 @@ package chat
 
 import (
 	"fmt"
+	"raidline/ripple/pgk/logger"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/spinner"
@@ -24,18 +25,17 @@ type responseMsg string
 
 // 3. THE MODEL (State)
 type model struct {
-	chatViewport    viewport.Model
-	watchMode       bool
-	sideViewport    viewport.Model // For the file change logs
-	textInput       textinput.Model
-	spinner         spinner.Model
-	history         []string
-	liveChanges     []string
-	err             error
-	isReady         bool
-	isLoading       bool
-	querier         *GraphQuerier
-	fileChangesChan <-chan []string
+	chatViewport viewport.Model
+	watchMode    bool
+	sideViewport viewport.Model // For the file change logs
+	textInput    textinput.Model
+	spinner      spinner.Model
+	history      []string
+	liveChanges  []string
+	err          error
+	isReady      bool
+	isLoading    bool
+	querier      *GraphQuerier
 
 	width  int
 	height int
@@ -49,7 +49,21 @@ type Tui struct {
 
 // todo: this should be better structured, very whacky
 func NewTui(q *GraphQuerier, watchMode bool, fileChangesChan <-chan []string) *Tui {
-	p := tea.NewProgram(initialModel(q, watchMode, fileChangesChan), tea.WithAltScreen())
+	m := initialModel(q, watchMode)
+	p := tea.NewProgram(initialModel(q, watchMode), tea.WithAltScreen())
+
+	//todo: in here, we need to create a goFunc that would listen for said channel and update the TUI
+	// TUI should receive the channel ready to go, we might need somehere we can create it and control it
+	//i think the issue is that we need to send a command when this happens for the tui,
+	//also creating this here is not working, this is running all the time! being called every time
+	go func() {
+		logger.Info("is this thing on?")
+		for _, change := range <-fileChangesChan {
+			logger.Info("is this thing off?")
+			m.liveChanges = append(m.liveChanges, change)
+			m.updateSideViewport()
+		}
+	}()
 
 	return &Tui{
 		program: p,
@@ -68,7 +82,7 @@ func (t *Tui) Init() error {
 	return nil
 }
 
-func initialModel(q *GraphQuerier, watchMode bool, fileChangesChan <-chan []string) model {
+func initialModel(q *GraphQuerier, watchMode bool) model {
 	ti := textinput.New()
 	ti.Placeholder = "Ask about your graph..."
 	ti.Focus()
@@ -80,13 +94,12 @@ func initialModel(q *GraphQuerier, watchMode bool, fileChangesChan <-chan []stri
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 
 	return model{
-		textInput:       ti,
-		spinner:         s,
-		querier:         q,
-		watchMode:       watchMode,
-		history:         []string{headerStyle.Render("--- Graph Analyzer Chat ---")},
-		liveChanges:     []string{headerStyle.Render("--- Project Live changes ---")},
-		fileChangesChan: fileChangesChan,
+		textInput:   ti,
+		spinner:     s,
+		querier:     q,
+		watchMode:   watchMode,
+		history:     []string{headerStyle.Render("--- Graph Analyzer Chat ---")},
+		liveChanges: []string{headerStyle.Render("--- Project Live changes ---")},
 	}
 }
 
@@ -104,16 +117,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		vpCmd tea.Cmd
 		spCmd tea.Cmd
 	)
-
-	//todo: in here, we need to create a goFunc that would listen for said channel and update the TUI
-	// TUI should receive the channel ready to go, we might need somehere we can create it and control it
-
-	go func() {
-		for _, change := range <-m.fileChangesChan {
-			m.liveChanges = append(m.liveChanges, change)
-			m.updateSideViewport()
-		}
-	}()
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:

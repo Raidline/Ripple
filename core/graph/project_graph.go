@@ -43,10 +43,7 @@ func (pg *ProjectGraph) FindAllWithEdge(filename string) []string {
 
 	var dependents []string
 	for _, edge := range target.InboundEdges {
-		if edge.To == target {
-			dependents = append(dependents, edge.From.Node.ClassName)
-			break
-		}
+		dependents = append(dependents, edge.From.Node.ClassName)
 	}
 	return dependents
 }
