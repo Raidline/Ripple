@@ -69,6 +69,8 @@ func (s *Service) Orchestrate(ctx context.Context,
 		})
 	}
 
+	//todo: nexte step - service for aggregation (not use case because it does not need other dependencies)
+
 	var languageErr error
 	var wantedLang languages.Language
 

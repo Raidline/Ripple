@@ -1,62 +1,93 @@
-package graph
+package services
 
 import (
 	"fmt"
 	"raidline/ripple/core/graph/file"
 	"raidline/ripple/core/graph/languages"
 	"raidline/ripple/core/graph/model"
+	"raidline/ripple/domain"
+	"raidline/ripple/domain/ports"
 	"raidline/ripple/errors"
 	"raidline/ripple/pgk/logger"
 	"strings"
 )
 
-type ProjectQuerier interface {
-	Exists(filename string) bool
-	FindAllWithEdge(filename string) []string
+type graphWriter struct {
+	state *domain.StateCoordinator
 }
 
-type ProjectGraphWriter interface {
-	Aggregate(files []*model.FileScan, wantedLang languages.Language) error
-}
-
-type ProjectGraph struct {
-	graph *model.ProjectGraph
-}
-
-func CreateProjectGraph() *ProjectGraph {
-	return &ProjectGraph{
-		graph: &model.ProjectGraph{
-			Vertices: make(map[string]*model.GraphVertice, 0),
-		},
+func NewGraphWriter(state *domain.StateCoordinator) ports.ProjectGraphWriter {
+	return &graphWriter{
+		state: state,
 	}
 }
 
-// --- Graph read operations --- \\
-func (pg *ProjectGraph) FindAllWithEdge(filename string) []string {
-	if len(pg.graph.Vertices) == 0 {
-		return make([]string, 0)
-	}
-	target, exists := pg.graph.Vertices[filename]
-	if !exists {
-		return nil
-	}
+func (w *graphWriter) CreateGraphForFile(
+	filename string,
+	fileGraph *model.ClassGraph,
+	seen map[string]bool,
+	fileNameToFileScan map[string]*model.FileScan,
+	onFileCallback func(fileScan *model.FileScan) (*model.ClassGraph, error)) (*model.GraphVertice, error) {
 
-	var dependents []string
-	for _, edge := range target.InboundEdges {
-		dependents = append(dependents, edge.From.Node.ClassName)
+	if vertice, ok := w.state.Graph.Vertices[fileGraph.ClassName]; ok {
+		// this might already exist but as a from dependency, now we need to add the to's
+		w.connectEdgesToVertice(vertice, fileNameToFileScan, fileGraph, func(fileScan *model.FileScan) (*model.GraphVertice, error) {
+			fileGraph, err := onFileCallback(fileScan)
+
+			if err != nil {
+				return nil, err
+			}
+
+			return w.CreateGraphForFile(filename, fileGraph, seen, fileNameToFileScan, onFileCallback)
+		})
+
+		seen[filename] = true
+
+		return vertice, nil
+	} else {
+		v := &model.GraphVertice{
+			Node:  fileGraph,
+			Edges: make([]model.GraphEdge, 0),
+		}
+		// todo(the fields and method info to get the weight of each import)
+		w.state.Graph.Vertices[fileGraph.ClassName] = v
+
+		//Edges will be added by memory reference
+		w.connectEdgesToVertice(v, fileNameToFileScan, fileGraph, func(fileScan *model.FileScan) (*model.GraphVertice, error) {
+			fileGraph, err := onFileCallback(fileScan)
+
+			if err != nil {
+				return nil, err
+			}
+
+			return w.CreateGraphForFile(filename, fileGraph, seen, fileNameToFileScan, onFileCallback)
+		})
+
+		seen[filename] = true
+
+		return v, nil
 	}
-	return dependents
 }
 
-func (pg *ProjectGraph) Exists(filename string) bool {
-	_, ok := pg.graph.Vertices[filename]
+func (w *graphWriter) Build(lang string) error {
+	var languageErr error
+	var wantedLang languages.Language
 
-	return ok
-}
+	if lang == string(languages.JAVA) {
+		wantedLang = languages.JAVA
+	} else if lang == string(languages.TS) {
+		wantedLang = languages.TS
+	} else {
+		languageErr = errors.NewLanguageNotSupportedError(lang)
+	}
 
-// --- Graph write operations --- \\
-func (agg *ProjectGraph) Aggregate(files []*model.FileScan, wantedLang languages.Language) error {
+	if languageErr != nil {
+		return languageErr
+	}
 
+	files := w.state.DirCreepResult.Files
+
+	//todo: in a optimal world we would get the lang by creeping the project.
 	if files == nil {
 		return errors.NewEmptySequenceError("files sequence")
 	}
@@ -73,16 +104,16 @@ func (agg *ProjectGraph) Aggregate(files []*model.FileScan, wantedLang languages
 		fileNameToFileScan[file.Name] = file
 	}
 
-	agg.createProjectGraph(fileNameToFileScan, fileAnalyser, wantedLang)
+	w.createProjectGraph(fileNameToFileScan, fileAnalyser, wantedLang)
 
 	go func() {
-		debugProjectGraph(agg.graph)
+		debugProjectGraph(w.state.Graph)
 	}()
 
 	return nil
 }
 
-func (agg *ProjectGraph) createProjectGraph(
+func (w *graphWriter) createProjectGraph(
 	fileNameToFileScan map[string]*model.FileScan,
 	fileAnalyser languages.LanguageAnalyser,
 	wantedLang languages.Language) error {
@@ -90,7 +121,7 @@ func (agg *ProjectGraph) createProjectGraph(
 	seen := make(map[string]bool, 0)
 
 	for _, file := range fileNameToFileScan {
-		_, e := agg.createGraphForFile(file, seen, fileNameToFileScan, fileAnalyser, wantedLang)
+		_, e := w.createGraphForFile(file, seen, fileNameToFileScan, fileAnalyser, wantedLang)
 
 		if e != nil {
 			return e
@@ -100,7 +131,7 @@ func (agg *ProjectGraph) createProjectGraph(
 	return nil
 }
 
-func (agg *ProjectGraph) createGraphForFile(fileScan *model.FileScan,
+func (w *graphWriter) createGraphForFile(fileScan *model.FileScan,
 	seen map[string]bool,
 	fileNameToFileScan map[string]*model.FileScan,
 	fileAnalyser languages.LanguageAnalyser,
@@ -120,10 +151,10 @@ func (agg *ProjectGraph) createGraphForFile(fileScan *model.FileScan,
 		return nil, fileGErr
 	}
 
-	if vertice, ok := agg.graph.Vertices[fileGraph.ClassName]; ok {
+	if vertice, ok := w.state.Graph.Vertices[fileGraph.ClassName]; ok {
 		// this might already exist but as a from dependency, now we need to add the to's
-		agg.connectEdgesToVertice(vertice, fileNameToFileScan, fileGraph, func(fileScan *model.FileScan) (*model.GraphVertice, error) {
-			return agg.createGraphForFile(fileScan, seen, fileNameToFileScan, fileAnalyser, wantedLang)
+		w.connectEdgesToVertice(vertice, fileNameToFileScan, fileGraph, func(fileScan *model.FileScan) (*model.GraphVertice, error) {
+			return w.createGraphForFile(fileScan, seen, fileNameToFileScan, fileAnalyser, wantedLang)
 		})
 
 		seen[fileScan.Name] = true
@@ -135,11 +166,11 @@ func (agg *ProjectGraph) createGraphForFile(fileScan *model.FileScan,
 			Edges: make([]model.GraphEdge, 0),
 		}
 		// todo(the fields and method info to get the weight of each import)
-		agg.graph.Vertices[fileGraph.ClassName] = v
+		w.state.Graph.Vertices[fileGraph.ClassName] = v
 
 		//Edges will be added by memory reference
-		agg.connectEdgesToVertice(v, fileNameToFileScan, fileGraph, func(fileScan *model.FileScan) (*model.GraphVertice, error) {
-			return agg.createGraphForFile(fileScan, seen, fileNameToFileScan, fileAnalyser, wantedLang)
+		w.connectEdgesToVertice(v, fileNameToFileScan, fileGraph, func(fileScan *model.FileScan) (*model.GraphVertice, error) {
+			return w.createGraphForFile(fileScan, seen, fileNameToFileScan, fileAnalyser, wantedLang)
 		})
 
 		seen[fileScan.Name] = true
@@ -148,7 +179,7 @@ func (agg *ProjectGraph) createGraphForFile(fileScan *model.FileScan,
 	}
 }
 
-func (agg *ProjectGraph) connectEdgesToVertice(vert *model.GraphVertice,
+func (w *graphWriter) connectEdgesToVertice(vert *model.GraphVertice,
 	fileNameToFileScan map[string]*model.FileScan,
 	fileGraph *model.ClassGraph, cb func(fileScan *model.FileScan) (*model.GraphVertice, error)) error {
 
@@ -162,7 +193,7 @@ func (agg *ProjectGraph) connectEdgesToVertice(vert *model.GraphVertice,
 
 	for name, scan := range fieldToDependency {
 
-		if vertice, ok := agg.graph.Vertices[name]; ok {
+		if vertice, ok := w.state.Graph.Vertices[name]; ok {
 
 			edge := model.GraphEdge{
 				To:     vertice,
