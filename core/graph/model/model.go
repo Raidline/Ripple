@@ -2,6 +2,12 @@ package model
 
 import "iter"
 
+// todo: this should not belong here...
+type LiveChangeMsg struct {
+	CausingFile string
+	Impacts     []string
+}
+
 type FileScan struct {
 	Dir   string
 	Name  string

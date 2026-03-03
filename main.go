@@ -58,7 +58,7 @@ func main() {
 	assertions.NonError(err, "Service gave an error while Orchestrating")
 
 	go func() {
-		e := runTUI(pg, *watchMode, serviceSt.WatcherRes)
+		e := runTUI(pg, *watchMode, serviceSt)
 
 		if e != nil {
 			cancel()
@@ -74,9 +74,9 @@ func main() {
 	logger.Info("Bye!")
 }
 
-func runTUI(pg graph.ProjectQuerier, watchMode bool, fileChangesChan <-chan []string) error {
+func runTUI(pg graph.ProjectQuerier, watchMode bool, stateControl *core.StateControl) error {
 	querier := chat.NewQuerier(pg)
-	t := chat.NewTui(querier, watchMode, fileChangesChan)
+	t := chat.NewTui(querier, watchMode, stateControl)
 
 	e := t.Init()
 

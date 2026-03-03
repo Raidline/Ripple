@@ -2,7 +2,7 @@ package chat
 
 import (
 	"fmt"
-	"raidline/ripple/pgk/logger"
+	"raidline/ripple/core"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/spinner"
@@ -20,8 +20,11 @@ var (
 	errorStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("9"))
 )
 
+const liveChangesHeader = "LIVE FILE CHANGES"
+
 // 2. MESSAGES (Events) - these need to be udpated
 type responseMsg string
+type liveChangesMsg []string
 
 // 3. THE MODEL (State)
 type model struct {
@@ -47,23 +50,34 @@ type Tui struct {
 	querier *GraphQuerier
 }
 
-// todo: this should be better structured, very whacky
-func NewTui(q *GraphQuerier, watchMode bool, fileChangesChan <-chan []string) *Tui {
+func NewTui(q *GraphQuerier, watchMode bool, stateControl *core.StateControl) *Tui {
 	m := initialModel(q, watchMode)
-	p := tea.NewProgram(initialModel(q, watchMode), tea.WithAltScreen())
+	p := tea.NewProgram(m, tea.WithAltScreen())
 
-	//todo: in here, we need to create a goFunc that would listen for said channel and update the TUI
-	// TUI should receive the channel ready to go, we might need somehere we can create it and control it
-	//i think the issue is that we need to send a command when this happens for the tui,
-	//also creating this here is not working, this is running all the time! being called every time
-	go func() {
-		logger.Info("is this thing on?")
-		for _, change := range <-fileChangesChan {
-			logger.Info("is this thing off?")
-			m.liveChanges = append(m.liveChanges, change)
-			m.updateSideViewport()
+	stateControl.Wg.Go(func() {
+		//this is now working
+
+		for {
+			select {
+			case <-stateControl.Ctx.Done():
+				return
+			case changes, ok := <-stateControl.WatcherRes:
+				if !ok {
+					return
+				}
+
+				impactsMsg := make([]string, len(changes.Impacts)+1)
+
+				impactsMsg[0] = fmt.Sprintf("Causing file : [%s], Impacts: \n", changes.CausingFile)
+
+				for i, v := range changes.Impacts {
+					impactsMsg[i+1] = fmt.Sprintf("├─▶ %s\n", v)
+				}
+
+				p.Send(liveChangesMsg(impactsMsg))
+			}
 		}
-	}()
+	})
 
 	return &Tui{
 		program: p,
@@ -99,7 +113,7 @@ func initialModel(q *GraphQuerier, watchMode bool) model {
 		querier:     q,
 		watchMode:   watchMode,
 		history:     []string{headerStyle.Render("--- Graph Analyzer Chat ---")},
-		liveChanges: []string{headerStyle.Render("--- Project Live changes ---")},
+		liveChanges: []string{headerStyle.Render("")},
 	}
 }
 
@@ -147,6 +161,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.isLoading = false
 		m.history = append(m.history, fmt.Sprintf("%s %s", aiStyle.Render("AI:"), string(msg)))
 		m.updateViewport()
+		return m, nil
+	case liveChangesMsg:
+		m.liveChanges = append(m.liveChanges, msg...)
+		m.updateSideViewport()
 		return m, nil
 	case tea.WindowSizeMsg:
 		m.height = msg.Height
@@ -220,7 +238,7 @@ func (m model) View() string {
 
 	sidebarBox := sidebarStyle.Render(
 		lipgloss.JoinVertical(lipgloss.Left,
-			headerStyle.Render("LIVE FILE CHANGES"),
+			headerStyle.Render(liveChangesHeader),
 			m.sideViewport.View(),
 		),
 	)
@@ -249,4 +267,5 @@ func (m *model) updateViewport() {
 
 func (m *model) updateSideViewport() {
 	m.sideViewport.SetContent(strings.Join(m.liveChanges, "\n"))
+	m.sideViewport.GotoTop()
 }

@@ -3,6 +3,7 @@ package events
 import (
 	"context"
 	"raidline/ripple/core/graph"
+	"raidline/ripple/core/graph/model"
 	"raidline/ripple/pgk/logger"
 	"strings"
 )
@@ -19,7 +20,7 @@ func NewFileListener(pg graph.ProjectQuerier) (*FileEventListener, error) {
 
 // events will maybe be another type, because we need the file name to go to the graph
 func (fl *FileEventListener) Listen(ctx context.Context, fileChanged <-chan string,
-	outCh chan []string) {
+	outCh chan model.LiveChangeMsg) {
 	logger.Info("Ready and listening...")
 
 	for {
@@ -40,7 +41,10 @@ func (fl *FileEventListener) Listen(ctx context.Context, fileChanged <-chan stri
 
 			if fl.graphQuerier.Exists(filename) {
 				impacts := fl.graphQuerier.FindAllWithEdge(filename)
-				outCh <- impacts
+				outCh <- model.LiveChangeMsg{
+					CausingFile: filename,
+					Impacts:     impacts,
+				}
 			} else {
 				logger.Info("The file we received update from is not in the graph. \n")
 			}

@@ -1,5 +1,7 @@
 #!/bin/bash
 
+rm -f ripple
+
 # --- CONFIGURATION ---
 BINARY_NAME="ripple"
 MAIN_FILE="main.go"

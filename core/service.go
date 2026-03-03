@@ -7,14 +7,18 @@ import (
 	"raidline/ripple/core/graph"
 	"raidline/ripple/core/graph/creeper"
 	"raidline/ripple/core/graph/languages"
+	"raidline/ripple/core/graph/model"
 	"raidline/ripple/errors"
 	"raidline/ripple/pgk/logger"
 	"sync"
 )
 
+// todo: this should be in another folder and every goroutine should be created there to centralize the state
+// this should not be here, and the service should receive this and not return this
 type StateControl struct {
+	Ctx        context.Context
 	Wg         *sync.WaitGroup
-	WatcherRes <-chan []string
+	WatcherRes chan model.LiveChangeMsg
 }
 
 type Service struct {
@@ -41,6 +45,7 @@ func (s *Service) Orchestrate(ctx context.Context,
 	// as per the improvements part we need to run in a goroutine the creeper to catch new changes that happened while the tool was not running
 	st := &StateControl{}
 	wg := &sync.WaitGroup{}
+	st.Ctx = ctx
 	st.Wg = wg
 
 	log.Printf("creeping project in dir : [%s] for lang : [%s]", root, lang)
@@ -51,8 +56,7 @@ func (s *Service) Orchestrate(ctx context.Context,
 	}
 
 	if watchMode {
-		//todo: the creation of this chan does not make sense! we need to refactor the BE before doing this, it is very messy now
-		watcherChan := make(chan []string)
+		st.WatcherRes = make(chan model.LiveChangeMsg, 10)
 		logger.Debug("Watch mode enabled, listening for changes...")
 		eventChan, wErr := s.watcher.Watch(ctx, creepRes.Dirs)
 
@@ -60,9 +64,8 @@ func (s *Service) Orchestrate(ctx context.Context,
 			panic(wErr)
 		}
 
-		st.WatcherRes = watcherChan
 		wg.Go(func() {
-			s.listener.Listen(ctx, eventChan, watcherChan)
+			s.listener.Listen(ctx, eventChan, st.WatcherRes)
 		})
 	}
 
