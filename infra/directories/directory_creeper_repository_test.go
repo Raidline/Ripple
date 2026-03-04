@@ -1,4 +1,4 @@
-package creeper
+package directories
 
 import (
 	"testing"
@@ -6,7 +6,9 @@ import (
 
 func TestCreepDir(t *testing.T) {
 
-	filesIter, err := CreepDir("../resources/test-files")
+	creeper := NewCreeper()
+
+	filesIter, err := creeper.CreepDir("../../resources/test-files")
 
 	if err != nil {
 		t.Errorf("Directory should be able to be read : %s", err.Error())

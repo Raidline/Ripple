@@ -1,22 +1,24 @@
 package file
 
 import (
-	"raidline/ripple/core/graph/creeper"
-	"raidline/ripple/core/graph/languages"
-	"raidline/ripple/core/graph/model"
+	"raidline/ripple/domain/model"
+	"raidline/ripple/infra"
+	"raidline/ripple/infra/directories"
 	"testing"
 )
 
 func TestBuildFileGraph(t *testing.T) {
 
-	creepRes, err := creeper.CreepDir("../../../resources/test-files")
+	creeper := directories.NewCreeper()
+
+	creepRes, err := creeper.CreepDir("../../resources/test-files")
 
 	if err != nil {
 		t.Errorf("Should be able to read the test resources, %s", err.Error())
 		t.FailNow()
 	}
 
-	var foundFile *model.FileScan
+	var foundFile *infra.FileScan
 
 	for _, f := range creepRes.Files {
 		if f.Name == "InspectionZoneService" {
@@ -24,7 +26,7 @@ func TestBuildFileGraph(t *testing.T) {
 		}
 	}
 
-	analyser, e := languages.GetAnalyser(languages.JAVA)
+	analyser, e := model.GetAnalyser(model.JAVA)
 
 	if e != nil {
 		t.Errorf("Should be able to create analyser, %s", e.Error())

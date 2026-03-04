@@ -2,8 +2,8 @@ package services
 
 import (
 	"context"
-	"raidline/ripple/core/graph/model"
 	"raidline/ripple/domain"
+	"raidline/ripple/domain/model"
 	"sort"
 	"testing"
 )

@@ -1,4 +1,4 @@
-package creeper
+package directories
 
 import (
 	"bufio"
@@ -6,24 +6,27 @@ import (
 	"iter"
 	"os"
 	"path/filepath"
-	"raidline/ripple/core/graph/model"
+	"raidline/ripple/domain/ports"
+	"raidline/ripple/infra"
 	"raidline/ripple/pgk/logger"
 	"strings"
 )
 
+type DirectoryCreeperRepo struct {
+}
+
 //todo: add support for TS and modify sanitize filename
+
+func NewCreeper() ports.DirectoryCreeperPort {
+	return &DirectoryCreeperRepo{}
+}
 
 const SUPPORTED_EXTENSION = ".java"
 
-type CreepScanResult struct {
-	Dirs  []string
-	Files []*model.FileScan
-}
-
-func CreepDir(dir string) (*CreepScanResult, error) {
+func (d *DirectoryCreeperRepo) CreepDir(dir string) (*infra.CreepScanResult, error) {
 
 	dirs := make([]string, 0)
-	files := make([]*model.FileScan, 0)
+	files := make([]*infra.FileScan, 0)
 	filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -41,7 +44,7 @@ func CreepDir(dir string) (*CreepScanResult, error) {
 				return fileErr
 			}
 
-			files = append(files, &model.FileScan{Dir: directory, Name: sanitizeFileName(d.Name()), Lines: fileLines})
+			files = append(files, &infra.FileScan{Dir: directory, Name: sanitizeFileName(d.Name()), Lines: fileLines})
 		}
 
 		return nil
@@ -49,7 +52,7 @@ func CreepDir(dir string) (*CreepScanResult, error) {
 
 	logger.Debug("Creeper has ended with [%d] dirs and [%d] files", len(dirs), len(files))
 
-	return &CreepScanResult{
+	return &infra.CreepScanResult{
 		Dirs:  dirs,
 		Files: files,
 	}, nil

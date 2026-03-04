@@ -1,28 +1,30 @@
 package application
 
 import (
-	"raidline/ripple/core/graph/languages"
-	"raidline/ripple/core/graph/model"
 	"raidline/ripple/domain"
+	"raidline/ripple/domain/model"
 	"raidline/ripple/domain/ports"
 	"raidline/ripple/errors"
+	"raidline/ripple/infra"
+	"raidline/ripple/infra/directories"
 	"raidline/ripple/infra/file"
 )
 
 type GraphBuildUseCase struct {
-	state       *domain.StateCoordinator
-	graphWriter ports.ProjectGraphWriter
-	repo        *file.FileGraphRepo
+	state           *domain.StateCoordinator
+	graphWriter     ports.ProjectGraphWriter
+	repo            *file.FileGraphRepo
+	directoriesRepo *directories.DirectoryCreeperRepo
 }
 
-func (w *GraphBuildUseCase) Build(lang string) error {
+func (w *GraphBuildUseCase) Build(lang string, files []*infra.FileScan) error {
 	var languageErr error
-	var wantedLang languages.Language
+	var wantedLang model.Language
 
-	if lang == string(languages.JAVA) {
-		wantedLang = languages.JAVA
-	} else if lang == string(languages.TS) {
-		wantedLang = languages.TS
+	if lang == string(model.JAVA) {
+		wantedLang = model.JAVA
+	} else if lang == string(model.TS) {
+		wantedLang = model.TS
 	} else {
 		languageErr = errors.NewLanguageNotSupportedError(lang)
 	}
@@ -31,20 +33,18 @@ func (w *GraphBuildUseCase) Build(lang string) error {
 		return languageErr
 	}
 
-	files := w.state.DirCreepResult.Files
-
 	//todo: in a optimal world we would get the lang by creeping the project.
 	if files == nil {
 		return errors.NewEmptySequenceError("files sequence")
 	}
 
-	fileAnalyser, e := languages.GetAnalyser(wantedLang)
+	fileAnalyser, e := model.GetAnalyser(wantedLang)
 
 	if e != nil {
 		return e
 	}
 
-	fileNameToFileScan := make(map[string]*model.FileScan, 0)
+	fileNameToFileScan := make(map[string]*infra.FileScan, 0)
 
 	for _, file := range files {
 		fileNameToFileScan[file.Name] = file
@@ -60,11 +60,11 @@ func (w *GraphBuildUseCase) Build(lang string) error {
 }
 
 func (w *GraphBuildUseCase) buildGraph(
-	fileNameToFileScan map[string]*model.FileScan,
-	fileAnalyser languages.LanguageAnalyser) error {
+	fileNameToFileScan map[string]*infra.FileScan,
+	fileAnalyser model.LanguageAnalyser) error {
 
 	var (
-		fileCallback = func(fileScan *model.FileScan) (*model.ClassGraph, error) {
+		fileCallback = func(fileScan *infra.FileScan) (*model.ClassGraph, error) {
 			fileGraph, fileGErr := w.repo.BuildFileGraph(fileScan, fileAnalyser)
 
 			if fileGErr != nil {

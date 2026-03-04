@@ -1,8 +1,13 @@
 package ports
 
 import (
-	"raidline/ripple/core/graph/model"
+	"raidline/ripple/domain/model"
+	"raidline/ripple/infra"
 )
+
+type DirectoryCreeperPort interface {
+	CreepDir(dir string) (*infra.CreepScanResult, error)
+}
 
 type FileWatcherPort interface {
 	Watch(dirs []string) (<-chan string, error)
@@ -18,6 +23,6 @@ type ProjectGraphWriter interface {
 		filename string,
 		fileGraph *model.ClassGraph,
 		seen map[string]bool,
-		fileNameToFileScan map[string]*model.FileScan,
-		onFileCallback func(fileScan *model.FileScan) (*model.ClassGraph, error)) (*model.GraphVertice, error)
+		fileNameToFileScan map[string]*infra.FileScan,
+		onFileCallback func(fileScan *infra.FileScan) (*model.ClassGraph, error)) (*model.GraphVertice, error)
 }

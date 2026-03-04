@@ -5,13 +5,19 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"raidline/ripple/application"
+	"raidline/ripple/domain/ports"
 	"raidline/ripple/pgk/assertions"
 	"raidline/ripple/pgk/logger"
 )
 
 type Cli struct {
+	watchFileUseCase *application.WatchFileChangesUseCase
+	graphBuilding    *application.GraphBuildUseCase
+	dirCreeper       ports.DirectoryCreeperPort
 }
 
+// todo: create something that injects things here
 func NewCli() *Cli {
 	return &Cli{}
 }
@@ -35,7 +41,17 @@ func (c *Cli) Init() (string, bool) {
 
 	logger.Info("Starting Analyzer on: %s", absPath)
 
-	//todo: if watchMode launch use case
+	res, err := c.dirCreeper.CreepDir(absPath)
+
+	if err != nil {
+		panic(err)
+	}
+
+	c.graphBuilding.Build(*lang, res.Files)
+
+	if *watchMode {
+		c.watchFileUseCase.WatchFileChange(res.Dirs)
+	}
 
 	return *lang, *watchMode
 }

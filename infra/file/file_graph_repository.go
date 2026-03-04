@@ -2,8 +2,8 @@ package file
 
 import (
 	"context"
-	"raidline/ripple/core/graph/languages"
-	"raidline/ripple/core/graph/model"
+	"raidline/ripple/domain/model"
+	"raidline/ripple/infra"
 
 	sitter "github.com/smacker/go-tree-sitter"
 )
@@ -14,9 +14,7 @@ func NewFileGraphRepo() *FileGraphRepo {
 	return &FileGraphRepo{}
 }
 
-//todo: migrate tests
-
-func (f *FileGraphRepo) BuildFileGraph(file *model.FileScan, analyser languages.LanguageAnalyser) (*model.ClassGraph, error) {
+func (f *FileGraphRepo) BuildFileGraph(file *infra.FileScan, analyser model.LanguageAnalyser) (*model.ClassGraph, error) {
 	source := convertFileScan(file)
 
 	parser := sitter.NewParser()
@@ -99,7 +97,7 @@ func (f *FileGraphRepo) BuildFileGraph(file *model.FileScan, analyser languages.
 	return graph, nil
 }
 
-func convertFileScan(file *model.FileScan) []byte {
+func convertFileScan(file *infra.FileScan) []byte {
 	var source []byte
 
 	for line := range file.Lines {

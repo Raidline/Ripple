@@ -1,8 +1,7 @@
-package languages
+package model
 
 import (
 	"fmt"
-	"raidline/ripple/core/graph/model"
 	"raidline/ripple/errors"
 	"raidline/ripple/pgk/assertions"
 	"strings"
@@ -30,10 +29,10 @@ type LanguageAnalyser interface {
 	GetCallQuery() *sitter.Query   // Query to find the calls that happen inside the method (depends on GetMethodQuery)
 
 	// Logic hooks for language-specific data mapping
-	MapMethod(tag, content string, m *model.Method)   // Maps the Method definition
-	MapField(tag, content string, f *model.Field)     // Maps the field
-	MapParam(tag, content string, p *model.Param)     // Maps the param for a method
-	MapCall(tag, content string, c *model.MethodCall) // Maps the call inside a method
+	MapMethod(tag, content string, m *Method)   // Maps the Method definition
+	MapField(tag, content string, f *Field)     // Maps the field
+	MapParam(tag, content string, p *Param)     // Maps the param for a method
+	MapCall(tag, content string, c *MethodCall) // Maps the call inside a method
 
 	//Language helper specific logic
 	IsProjectImport(content string) bool
@@ -125,7 +124,7 @@ func (j *JavaAnalyzer) GetCallQuery() *sitter.Query {
 	return j.callQuery
 }
 
-func (j *JavaAnalyzer) MapMethod(tag, content string, m *model.Method) {
+func (j *JavaAnalyzer) MapMethod(tag, content string, m *Method) {
 	switch tag {
 	case "method.return":
 		m.ReturnType = content
@@ -134,7 +133,7 @@ func (j *JavaAnalyzer) MapMethod(tag, content string, m *model.Method) {
 	}
 }
 
-func (j *JavaAnalyzer) MapField(tag, content string, f *model.Field) {
+func (j *JavaAnalyzer) MapField(tag, content string, f *Field) {
 	switch tag {
 	case "type":
 		f.Type = content
@@ -143,7 +142,7 @@ func (j *JavaAnalyzer) MapField(tag, content string, f *model.Field) {
 	}
 }
 
-func (j *JavaAnalyzer) MapParam(tag, content string, p *model.Param) {
+func (j *JavaAnalyzer) MapParam(tag, content string, p *Param) {
 	switch tag {
 	case "t":
 		p.Type = content
@@ -152,7 +151,7 @@ func (j *JavaAnalyzer) MapParam(tag, content string, p *model.Param) {
 	}
 }
 
-func (j *JavaAnalyzer) MapCall(tag, content string, c *model.MethodCall) {
+func (j *JavaAnalyzer) MapCall(tag, content string, c *MethodCall) {
 	switch tag {
 	case "tgt":
 		c.Target = content
@@ -227,7 +226,7 @@ func (t *TypeScriptAnalyzer) GetCallQuery() *sitter.Query {
 	return t.callQuery
 }
 
-func (t *TypeScriptAnalyzer) MapMethod(tag, content string, m *model.Method) {
+func (t *TypeScriptAnalyzer) MapMethod(tag, content string, m *Method) {
 	switch tag {
 	case "method.name":
 		m.Name = content
@@ -236,7 +235,7 @@ func (t *TypeScriptAnalyzer) MapMethod(tag, content string, m *model.Method) {
 	}
 }
 
-func (t *TypeScriptAnalyzer) MapField(tag, content string, f *model.Field) {
+func (t *TypeScriptAnalyzer) MapField(tag, content string, f *Field) {
 	switch tag {
 	case "name":
 		f.Name = content
@@ -245,7 +244,7 @@ func (t *TypeScriptAnalyzer) MapField(tag, content string, f *model.Field) {
 	}
 }
 
-func (t *TypeScriptAnalyzer) MapParam(tag, content string, p *model.Param) {
+func (t *TypeScriptAnalyzer) MapParam(tag, content string, p *Param) {
 	switch tag {
 	case "n":
 		p.Name = content
@@ -254,7 +253,7 @@ func (t *TypeScriptAnalyzer) MapParam(tag, content string, p *model.Param) {
 	}
 }
 
-func (t *TypeScriptAnalyzer) MapCall(tag, content string, c *model.MethodCall) {
+func (t *TypeScriptAnalyzer) MapCall(tag, content string, c *MethodCall) {
 	switch tag {
 	case "tgt":
 		c.Target = content

@@ -1,8 +1,8 @@
 package application
 
 import (
-	"raidline/ripple/core/graph/model"
 	"raidline/ripple/domain"
+	"raidline/ripple/domain/model"
 	"raidline/ripple/domain/ports"
 	"raidline/ripple/pgk/logger"
 )
@@ -22,11 +22,11 @@ func NewWatchFileUseCase(watcher ports.FileWatcherPort,
 	}
 }
 
-func (w *WatchFileChangesUseCase) WatchFileChange() (<-chan model.LiveChangeMsg, error) {
+func (w *WatchFileChangesUseCase) WatchFileChange(dirs []string) (<-chan model.LiveChangeMsg, error) {
 	logger.Debug("Watch mode enabled, listening for changes...")
 	liveChan := make(chan model.LiveChangeMsg, 10)
 
-	eventChan, wErr := w.watcher.Watch(w.state.DirCreepResult.Dirs)
+	eventChan, wErr := w.watcher.Watch(dirs)
 
 	if wErr != nil {
 		return nil, wErr

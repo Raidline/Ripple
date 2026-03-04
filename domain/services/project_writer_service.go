@@ -1,9 +1,10 @@
 package services
 
 import (
-	"raidline/ripple/core/graph/model"
 	"raidline/ripple/domain"
+	"raidline/ripple/domain/model"
 	"raidline/ripple/domain/ports"
+	"raidline/ripple/infra"
 )
 
 type graphWriter struct {
@@ -20,12 +21,12 @@ func (w *graphWriter) CreateGraphForFile(
 	filename string,
 	fileGraph *model.ClassGraph,
 	seen map[string]bool,
-	fileNameToFileScan map[string]*model.FileScan,
-	onFileCallback func(fileScan *model.FileScan) (*model.ClassGraph, error)) (*model.GraphVertice, error) {
+	fileNameToFileScan map[string]*infra.FileScan,
+	onFileCallback func(fileScan *infra.FileScan) (*model.ClassGraph, error)) (*model.GraphVertice, error) {
 
 	if vertice, ok := w.state.Graph.Vertices[fileGraph.ClassName]; ok {
 		// this might already exist but as a from dependency, now we need to add the to's
-		w.connectEdgesToVertice(vertice, fileNameToFileScan, fileGraph, func(fileScan *model.FileScan) (*model.GraphVertice, error) {
+		w.connectEdgesToVertice(vertice, fileNameToFileScan, fileGraph, func(fileScan *infra.FileScan) (*model.GraphVertice, error) {
 			fileGraph, err := onFileCallback(fileScan)
 
 			if err != nil {
@@ -44,7 +45,7 @@ func (w *graphWriter) CreateGraphForFile(
 		w.state.Graph.Vertices[fileGraph.ClassName] = v
 
 		//Edges will be added by memory reference
-		w.connectEdgesToVertice(v, fileNameToFileScan, fileGraph, func(fileScan *model.FileScan) (*model.GraphVertice, error) {
+		w.connectEdgesToVertice(v, fileNameToFileScan, fileGraph, func(fileScan *infra.FileScan) (*model.GraphVertice, error) {
 			fileGraph, err := onFileCallback(fileScan)
 
 			if err != nil {
@@ -61,10 +62,10 @@ func (w *graphWriter) CreateGraphForFile(
 }
 
 func (w *graphWriter) connectEdgesToVertice(vert *model.GraphVertice,
-	fileNameToFileScan map[string]*model.FileScan,
-	fileGraph *model.ClassGraph, cb func(fileScan *model.FileScan) (*model.GraphVertice, error)) error {
+	fileNameToFileScan map[string]*infra.FileScan,
+	fileGraph *model.ClassGraph, cb func(fileScan *infra.FileScan) (*model.GraphVertice, error)) error {
 
-	fieldToDependency := make(map[string]*model.FileScan, 0)
+	fieldToDependency := make(map[string]*infra.FileScan, 0)
 
 	for _, f := range fileGraph.Fields {
 		if v, ok := fileNameToFileScan[f.Type]; ok {
