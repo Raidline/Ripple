@@ -95,7 +95,7 @@ func (f *FileWatcher) Watch(ctx context.Context, dirs []string) (<-chan string, 
 
 				if event.Op.Has(fsnotify.Create) {
 					// this can be a case where the file was added. In this case we just update the projectGraph
-					// todo: send update to the graph here
+					// send update to the graph here
 					// When the Watcher updates a file, it should create a totally new GraphVertice object and replace the old one in the map.
 					//The TUI will keep holding the "old" version it was reading (which is safe, because that old slice isn't being modified anymore).
 					//The Map will now point to the "new" version.

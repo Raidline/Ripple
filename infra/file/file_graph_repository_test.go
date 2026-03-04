@@ -31,7 +31,9 @@ func TestBuildFileGraph(t *testing.T) {
 		t.FailNow()
 	}
 
-	graph, ge := BuildFileGraph(foundFile, analyser)
+	repo := NewFileGraphRepo()
+
+	graph, ge := repo.BuildFileGraph(foundFile, analyser)
 
 	if ge != nil {
 		t.Errorf("Should be able to construct a graph for the file : %s -> [%s]", foundFile.Name, ge.Error())

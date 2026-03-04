@@ -14,7 +14,6 @@ type ProjectGraphQuerier interface {
 }
 
 type ProjectGraphWriter interface {
-	Build(lang string) error
 	CreateGraphForFile(
 		filename string,
 		fileGraph *model.ClassGraph,
