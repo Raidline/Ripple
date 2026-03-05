@@ -22,14 +22,14 @@ func NewWatchFileUseCase(watcher ports.FileWatcherPort,
 	}
 }
 
-func (w *WatchFileChangesUseCase) WatchFileChange(dirs []string) (<-chan model.LiveChangeMsg, error) {
+func (w *WatchFileChangesUseCase) WatchFileChange(dirs []string) error {
 	logger.Debug("Watch mode enabled, listening for changes...")
 	liveChan := make(chan model.LiveChangeMsg, 10)
 
 	eventChan, wErr := w.watcher.Watch(dirs)
 
 	if wErr != nil {
-		return nil, wErr
+		return wErr
 	}
 
 	w.state.CreateGoroutine(func() {
@@ -58,5 +58,7 @@ func (w *WatchFileChangesUseCase) WatchFileChange(dirs []string) (<-chan model.L
 		}
 	})
 
-	return liveChan, nil
+	w.state.LiveChangeChan = liveChan
+
+	return nil
 }

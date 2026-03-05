@@ -17,12 +17,16 @@ type Cli struct {
 	dirCreeper       ports.DirectoryCreeperPort
 }
 
-// todo: create something that injects things here
-func NewCli() *Cli {
-	return &Cli{}
+func NewCli(watchFileUseCase *application.WatchFileChangesUseCase,
+	graphBuildin *application.GraphBuildUseCase, dirCreeper ports.DirectoryCreeperPort) *Cli {
+	return &Cli{
+		watchFileUseCase: watchFileUseCase,
+		graphBuilding:    graphBuildin,
+		dirCreeper:       dirCreeper,
+	}
 }
 
-func (c *Cli) Init() (string, bool) {
+func (c *Cli) Init() {
 	rootPath := flag.String("path", ".", "The root path of the project to analyze")
 	lang := flag.String("lang", ".", "The main language of the project")
 	watchMode := flag.Bool("watch", false, "Watch live changes to the project")
@@ -50,8 +54,10 @@ func (c *Cli) Init() (string, bool) {
 	c.graphBuilding.Build(*lang, res.Files)
 
 	if *watchMode {
-		c.watchFileUseCase.WatchFileChange(res.Dirs)
-	}
+		err := c.watchFileUseCase.WatchFileChange(res.Dirs)
 
-	return *lang, *watchMode
+		if err != nil {
+			panic(err)
+		}
+	}
 }

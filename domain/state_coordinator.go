@@ -9,9 +9,10 @@ import (
 // the Graph this might need a mutex around if we write and read at the same time (not needed at the moment because we only write at build time)
 
 type StateCoordinator struct {
-	Ctx   context.Context
-	Graph *model.ProjectGraph //todo: make private and have methods to access?
-	wg    *sync.WaitGroup     //global waitGroup for top-level goroutines
+	Ctx            context.Context
+	LiveChangeChan <-chan model.LiveChangeMsg
+	Graph          *model.ProjectGraph //todo: make private and have methods to access?
+	wg             *sync.WaitGroup     //global waitGroup for top-level goroutines
 }
 
 //this should deal with all creation of goroutine and such
@@ -19,8 +20,9 @@ type StateCoordinator struct {
 // todo: receive the rest (or set)
 func NewStateCoordinator(ctx context.Context) *StateCoordinator {
 	return &StateCoordinator{
-		Ctx: ctx,
-		wg:  &sync.WaitGroup{},
+		Ctx:            ctx,
+		wg:             &sync.WaitGroup{},
+		LiveChangeChan: nil,
 	}
 }
 
@@ -36,4 +38,8 @@ func (s *StateCoordinator) ResetGraph() {
 	s.Graph = &model.ProjectGraph{
 		Vertices: map[string]*model.GraphVertice{},
 	}
+}
+
+func (s *StateCoordinator) IsLiveWatchMode() bool {
+	return s.LiveChangeChan != nil
 }

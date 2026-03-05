@@ -2,8 +2,11 @@ package main
 
 import (
 	"context"
-	"raidline/ripple/chat"
+	"raidline/ripple/application"
 	"raidline/ripple/domain"
+	"raidline/ripple/domain/services"
+	"raidline/ripple/infra/directories"
+	"raidline/ripple/infra/file"
 	"raidline/ripple/pgk/logger"
 	"raidline/ripple/ui"
 )
@@ -13,10 +16,25 @@ func main() {
 	defer cancel()
 	stateCoordinator := domain.NewStateCoordinator(ctx)
 
-	lang, watchMode := ui.NewCli().Init()
+	watcher, e := services.NewWatcher(stateCoordinator)
+	if e != nil {
+		panic(e)
+	}
+
+	querier := services.NewQuerier(stateCoordinator)
+	graphWriter := services.NewGraphWriter(stateCoordinator)
+	directoryCreeperPort := directories.NewCreeper()
+
+	watchFileUseCase := application.NewWatchFileUseCase(watcher, querier, stateCoordinator)
+	graphBuildUseCase := application.NewGraphBuildUseCase(stateCoordinator, graphWriter, file.NewFileGraphRepo(),
+		directoryCreeperPort)
+
+	ui.NewCli(watchFileUseCase, graphBuildUseCase, directoryCreeperPort).Init()
 
 	go func() {
-		e := runTUI(pg, *watchMode, serviceSt)
+		t := ui.NewTui(stateCoordinator)
+
+		e := t.Init()
 
 		if e != nil {
 			cancel()
@@ -30,13 +48,4 @@ func main() {
 	logger.Info("Shutting down background services...")
 	stateCoordinator.Wait()
 	logger.Info("Bye!")
-}
-
-func runTUI(pg graph.ProjectQuerier, watchMode bool, stateControl *core.StateControl) error {
-	querier := chat.NewQuerier(pg)
-	t := chat.NewTui(querier, watchMode, stateControl)
-
-	e := t.Init()
-
-	return e
 }

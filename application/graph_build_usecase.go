@@ -6,7 +6,6 @@ import (
 	"raidline/ripple/domain/ports"
 	"raidline/ripple/errors"
 	"raidline/ripple/infra"
-	"raidline/ripple/infra/directories"
 	"raidline/ripple/infra/file"
 )
 
@@ -14,7 +13,17 @@ type GraphBuildUseCase struct {
 	state           *domain.StateCoordinator
 	graphWriter     ports.ProjectGraphWriter
 	repo            *file.FileGraphRepo
-	directoriesRepo *directories.DirectoryCreeperRepo
+	directoriesRepo ports.DirectoryCreeperPort
+}
+
+func NewGraphBuildUseCase(state *domain.StateCoordinator, graphWriter ports.ProjectGraphWriter,
+	repo *file.FileGraphRepo, dirsRepo ports.DirectoryCreeperPort) *GraphBuildUseCase {
+	return &GraphBuildUseCase{
+		state:           state,
+		graphWriter:     graphWriter,
+		repo:            repo,
+		directoriesRepo: dirsRepo,
+	}
 }
 
 func (w *GraphBuildUseCase) Build(lang string, files []*infra.FileScan) error {
